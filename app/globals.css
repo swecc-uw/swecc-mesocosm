@@ -1,0 +1,345 @@
+@import "tailwindcss";
+
+/* Tell Tailwind: `dark:*` matches our explicit data-theme attribute,
+   not the OS prefers-color-scheme media query (boot script handles OS). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ═══════════════════════════════════════════════════════════════════
+   MESOCOSM — DESIGN TOKENS  (canonical source: uiv2/BenchAnything Design System (1)/colors_and_type.css)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/CormorantGaramond-VariableFont_wght.ttf') format('truetype-variations'),
+       url('/fonts/CormorantGaramond-VariableFont_wght.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/CormorantGaramond-Italic-VariableFont_wght.ttf') format('truetype-variations'),
+       url('/fonts/CormorantGaramond-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Jost';
+  src: url('/fonts/Jost-VariableFont_wght.ttf') format('truetype-variations'),
+       url('/fonts/Jost-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Jost';
+  src: url('/fonts/Jost-Italic-VariableFont_wght.ttf') format('truetype-variations'),
+       url('/fonts/Jost-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@theme {
+  /* ── Mesocosm color tokens (Tailwind utilities + CSS variables) ── */
+  --color-paper:      #FFFFFF;
+  --color-paper-2:    oklch(0.985 0.003 150);
+  --color-paper-3:    oklch(0.965 0.005 150);
+  --color-vellum:     oklch(0.99  0.008 150);
+
+  --color-ink:        #0E1110;
+  --color-ink-2:      oklch(0.32 0.008 150);
+  --color-ink-3:      oklch(0.50 0.008 150);
+  --color-muted:      oklch(0.62 0.006 150);
+  --color-line:       oklch(0.92 0.008 150);
+  --color-line-2:     oklch(0.86 0.010 150);
+
+  --color-leaf:       oklch(0.52 0.10 150);
+  --color-leaf-deep:  oklch(0.38 0.10 150);
+  --color-leaf-soft:  oklch(0.78 0.06 150);
+  --color-leaf-tint:  oklch(0.94 0.025 150);
+  --color-leaf-faint: oklch(0.985 0.012 150);
+
+  --color-ok:   oklch(0.55 0.10 150);
+  --color-warn: oklch(0.66 0.13 75);
+  --color-bad:  oklch(0.55 0.15 25);
+
+  /* ── Fonts ── */
+  --font-display: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  --font-body:    'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans:    'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+/* ── Aliases for design-system class names (so SKILL.md helper classes
+      and lander CSS can keep using the short forms without the
+      --color- prefix). Falls through to the @theme variables, so dark
+      mode overrides on --color-* propagate. ─────────────────────── */
+:root {
+  --paper:       var(--color-paper);
+  --paper-2:     var(--color-paper-2);
+  --paper-3:     var(--color-paper-3);
+  --vellum:      var(--color-vellum);
+  --ink:         var(--color-ink);
+  --ink-2:       var(--color-ink-2);
+  --ink-3:       var(--color-ink-3);
+  --muted:       var(--color-muted);
+  --line:        var(--color-line);
+  --line-2:      var(--color-line-2);
+  --leaf:        var(--color-leaf);
+  --leaf-deep:   var(--color-leaf-deep);
+  --leaf-soft:   var(--color-leaf-soft);
+  --leaf-tint:   var(--color-leaf-tint);
+  --leaf-faint:  var(--color-leaf-faint);
+  --ok:          var(--color-ok);
+  --warn:        var(--color-warn);
+  --bad:         var(--color-bad);
+  --f-display:   var(--font-display);
+  --f-body:      var(--font-body);
+  --f-mono:      var(--font-mono);
+
+  --radius:      2px;
+  --radius-md:   6px;
+  --radius-pill: 999px;
+
+  --shadow-soft:  0 1px 2px oklch(0.20 0.04 150 / 0.04),
+                  0 4px 16px oklch(0.20 0.04 150 / 0.04);
+  --shadow-float: 0 16px 48px -16px oklch(0.20 0.04 150 / 0.22);
+  --shadow-deep:  0 24px 64px -20px oklch(0.20 0.04 150 / 0.36);
+
+  /* Legacy alias used by old layout.tsx body class */
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DARK MODE — "night reading"
+   Override --color-* (which Tailwind utilities resolve at runtime),
+   and the design-system aliases above pick up via the var() chain.
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --color-paper:      oklch(0.18 0.012 150);
+  --color-paper-2:    oklch(0.22 0.014 150);
+  --color-paper-3:    oklch(0.26 0.016 150);
+  --color-vellum:     oklch(0.20 0.020 150);
+
+  --color-ink:        oklch(0.94 0.008 150);
+  --color-ink-2:      oklch(0.78 0.010 150);
+  --color-ink-3:      oklch(0.62 0.010 150);
+  --color-muted:      oklch(0.50 0.008 150);
+  --color-line:       oklch(0.30 0.012 150);
+  --color-line-2:     oklch(0.38 0.014 150);
+
+  --color-leaf:       oklch(0.68 0.10 150);
+  --color-leaf-deep:  oklch(0.74 0.10 150);
+  --color-leaf-soft:  oklch(0.55 0.08 150);
+  --color-leaf-tint:  oklch(0.28 0.05 150);
+  --color-leaf-faint: oklch(0.22 0.020 150);
+
+  --color-ok:   oklch(0.72 0.10 150);
+  --color-warn: oklch(0.78 0.13 75);
+  --color-bad:  oklch(0.70 0.16 25);
+
+  --shadow-soft:  0 1px 2px oklch(0 0 0 / 0.40),
+                  0 4px 16px oklch(0 0 0 / 0.30);
+  --shadow-float: 0 16px 48px -16px oklch(0 0 0 / 0.6);
+  --shadow-deep:  0 24px 64px -20px oklch(0 0 0 / 0.7);
+}
+[data-theme="dark"] body { color-scheme: dark; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0.005em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: var(--leaf-tint); color: var(--ink); }
+
+/* Italic-leaf signature — one phrase per heading. */
+h1 em, h2 em, h3 em, .t-display-1 em, .t-display-2 em,
+.t-wordmark em, .t-def em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--leaf-deep);
+}
+
+/* Hairline divider. */
+.hairline, hr.hairline {
+  height: 1px; border: 0; background: var(--line); margin: 0;
+}
+
+/* Old-style figures helper. */
+.num-old {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 500;
+  font-variant-numeric: oldstyle-nums;
+  letter-spacing: -0.005em;
+}
+.num-tab { font-variant-numeric: tabular-nums; }
+
+/* Eyebrow. */
+.eyebrow {
+  font-family: var(--f-body);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.eyebrow-leaf { color: var(--leaf-deep); }
+
+/* Phonetic — dictionary-style /ˈbɛntʃ·ɛn·ɪ·θɪŋ/. */
+.t-phon {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: clamp(18px, 2vw, 26px);
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.t-phon::before { content: "/"; color: var(--ink-3); padding-right: 0.15em; }
+.t-phon::after  { content: "/"; color: var(--ink-3); padding-left:  0.15em; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   LANDER HERO — dictionary entry, ported from uiv2 landing.jsx
+   ═══════════════════════════════════════════════════════════════════ */
+.hero {
+  position: relative;
+  background: var(--vellum);
+  background-image: radial-gradient(ellipse at 50% 40%, var(--leaf-tint) 0%, transparent 55%);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.hero-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 96px 40px 56px;
+}
+.hero-meta-top {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 80px;
+}
+.dictionary {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 28px;
+}
+.dict-word {
+  font-family: var(--f-display);
+  font-size: clamp(80px, 14vw, 200px);
+  font-weight: 500;
+  letter-spacing: -0.028em;
+  line-height: 0.92;
+  margin: 0;
+  color: var(--ink);
+}
+.dict-pron {
+  display: inline-flex; align-items: baseline; gap: 18px;
+  font-family: var(--f-display);
+}
+.dict-pos {
+  font-style: italic; font-size: 22px; color: var(--ink-3);
+}
+.dict-phon {
+  font-style: italic;
+  font-size: clamp(20px, 2vw, 28px);
+  color: var(--ink-2);
+}
+.dict-phon .slash, .dict-phon .dot { color: var(--ink-3); padding: 0 0.08em; }
+.dict-def {
+  font-family: var(--f-display);
+  font-size: clamp(22px, 2.4vw, 30px);
+  line-height: 1.45; font-weight: 400;
+  color: var(--ink);
+  max-width: 32ch;
+  margin: 0;
+  text-wrap: balance;
+}
+.dict-def em { font-style: italic; color: var(--leaf-deep); font-weight: 500; }
+.dict-etym {
+  display: inline-flex; align-items: center; gap: 14px;
+  font-family: var(--f-body); font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.18em;
+  margin-top: 4px;
+}
+.dict-etym .rule { width: 28px; height: 1px; background: var(--line-2); }
+
+.hero-cta {
+  display: flex; justify-content: center; align-items: center;
+  gap: 28px; margin-top: 56px;
+}
+
+.hero-meta-bottom {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--f-body); font-size: 11px; color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hero-etym-line {
+  font-family: var(--f-display); font-style: italic;
+  font-size: 13px; color: var(--ink-3);
+  text-transform: none; letter-spacing: 0;
+}
+.hero-etym-line em {
+  font-style: italic; color: var(--leaf-deep); font-weight: 500;
+}
+
+/* Process strip */
+.process-section { padding: 120px 0; border-bottom: 1px solid var(--line); }
+.process-wrap { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
+.process-h {
+  font-family: var(--f-display); font-weight: 500;
+  font-size: clamp(36px, 4vw, 48px); letter-spacing: -0.018em;
+  line-height: 1.08;
+  margin: 16px 0 56px;
+  max-width: 24ch;
+}
+.process-h em { font-style: italic; color: var(--leaf-deep); font-weight: 500; }
+.process-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+.process-cell {
+  padding: 24px 32px 24px 0;
+  border-right: 1px solid var(--line);
+}
+.process-cell:not(:first-child) { padding-left: 32px; }
+.process-cell:last-child { border-right: 0; padding-right: 0; }
+.process-num {
+  font-family: var(--f-display); font-style: italic;
+  font-size: 32px; font-weight: 500;
+  color: var(--leaf-deep);
+  letter-spacing: -0.02em;
+  margin-bottom: 14px;
+}
+.process-title {
+  font-family: var(--f-display); font-size: 22px; font-weight: 500;
+  letter-spacing: -0.012em; line-height: 1.2;
+  margin-bottom: 10px;
+}
+.process-body {
+  font-family: var(--f-body); font-size: 14px; line-height: 1.55;
+  color: var(--ink-2);
+}
+
+@media (max-width: 760px) {
+  .hero-wrap { padding: 64px 24px 40px; }
+  .hero-meta-top { margin-bottom: 48px; flex-direction: column; gap: 8px; }
+  .process-section { padding: 80px 0; }
+  .process-grid { grid-template-columns: 1fr; gap: 32px; }
+  .process-cell { padding: 0; border-right: 0; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+  .process-cell:last-child { border-bottom: 0; }
+}
