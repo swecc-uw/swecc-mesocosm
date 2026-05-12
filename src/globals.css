@@ -10,32 +10,32 @@
 
 @font-face {
   font-family: 'Cormorant Garamond';
-  src: url('/fonts/CormorantGaramond-VariableFont_wght.ttf') format('truetype-variations'),
-       url('/fonts/CormorantGaramond-VariableFont_wght.ttf') format('truetype');
+  src: url('./assets/fonts/CormorantGaramond-VariableFont_wght.ttf') format('truetype-variations'),
+       url('./assets/fonts/CormorantGaramond-VariableFont_wght.ttf') format('truetype');
   font-weight: 300 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Cormorant Garamond';
-  src: url('/fonts/CormorantGaramond-Italic-VariableFont_wght.ttf') format('truetype-variations'),
-       url('/fonts/CormorantGaramond-Italic-VariableFont_wght.ttf') format('truetype');
+  src: url('./assets/fonts/CormorantGaramond-Italic-VariableFont_wght.ttf') format('truetype-variations'),
+       url('./assets/fonts/CormorantGaramond-Italic-VariableFont_wght.ttf') format('truetype');
   font-weight: 300 700;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: 'Jost';
-  src: url('/fonts/Jost-VariableFont_wght.ttf') format('truetype-variations'),
-       url('/fonts/Jost-VariableFont_wght.ttf') format('truetype');
+  src: url('./assets/fonts/Jost-VariableFont_wght.ttf') format('truetype-variations'),
+       url('./assets/fonts/Jost-VariableFont_wght.ttf') format('truetype');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Jost';
-  src: url('/fonts/Jost-Italic-VariableFont_wght.ttf') format('truetype-variations'),
-       url('/fonts/Jost-Italic-VariableFont_wght.ttf') format('truetype');
+  src: url('./assets/fonts/Jost-Italic-VariableFont_wght.ttf') format('truetype-variations'),
+       url('./assets/fonts/Jost-Italic-VariableFont_wght.ttf') format('truetype');
   font-weight: 100 900;
   font-style: italic;
   font-display: swap;

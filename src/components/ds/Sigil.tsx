@@ -1,3 +1,5 @@
+import { publicAssetUrl } from "@/lib/publicAssetUrl";
+
 const SIGIL_NAMES = [
   "fern",
   "frond",
@@ -34,7 +36,7 @@ export function Sigil({ name, id, size = 64, className = "" }: Props) {
   const chosen = name ?? (id ? sigilFor(id) : "fern");
   return (
     <img
-      src={`/sigils/${chosen}.svg`}
+      src={publicAssetUrl(`sigils/${chosen}.svg`)}
       alt=""
       aria-hidden="true"
       width={size}
