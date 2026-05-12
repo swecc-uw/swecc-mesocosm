@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Domain,
   LeaderboardEntry,
@@ -12,6 +12,16 @@ export function HomePage() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [leaderboards, setLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const st = location.state as { scrollToGallery?: boolean } | null;
+    if (st?.scrollToGallery) {
+      document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
+      navigate(".", { replace: true, state: {} });
+    }
+  }, [location.state, location.key, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,12 +149,15 @@ function Hero({ exhibitsLive }: { exhibitsLive: number }) {
         </article>
 
         <div className="hero-cta">
-          <a
-            href="#gallery"
+          <button
+            type="button"
+            onClick={() =>
+              document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" })
+            }
             className="inline-flex items-center gap-2 rounded-full px-5 h-10 text-sm font-medium bg-ink text-paper hover:bg-leaf-deep dark:bg-leaf-deep dark:hover:bg-leaf transition-colors"
           >
             Enter the gallery <span aria-hidden>→</span>
-          </a>
+          </button>
           <Link to="/showcase" className="text-sm text-ink hover:text-leaf-deep transition-colors inline-flex items-center gap-2">
             See how it works <span aria-hidden>→</span>
           </Link>

@@ -71,7 +71,11 @@ export function ShowcasePage() {
 
       <p className="mt-8 text-sm text-ink-3">
         Looking for real environments to bench against?{" "}
-        <Link to="/#gallery" className="text-ink hover:text-leaf-deep transition-colors underline underline-offset-2">
+        <Link
+          to="/"
+          state={{ scrollToGallery: true }}
+          className="text-ink hover:text-leaf-deep transition-colors underline underline-offset-2"
+        >
           Browse the gallery →
         </Link>
       </p>

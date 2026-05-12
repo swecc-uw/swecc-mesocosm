@@ -32,7 +32,17 @@ VITE_PUBLIC_API_BASE=http://127.0.0.1:8000
 
 ### GitHub Pages
 
-If the site is served from a **project** URL (`https://<user>.github.io/<repo>/`), set `base` in `vite.config.ts` to `'/<repo>/'` before building. For a custom domain at the root (e.g. `mesocosm.swecc.org`), keep `base: '/'` (default).
+The site is set up for **project Pages**: `https://swecc-uw.github.io/swecc-mesocosm/`.
+
+- **`package.json` → `homepage`** must stay the real public URL. Vite infers **`base`** from it for **`npm run build`** and **`npm run preview`**. CI does not need to set anything unless you override with an Actions variable **`VITE_BASE_PATH`**.
+- **`npm run dev`** always uses **`base: '/'`**, so you open **http://localhost:5173/** (not the `/swecc-mesocosm/` path).
+- **Production** with that project URL uses **hash routing** (`…/swecc-mesocosm/#/…`) so the static host never has to rewrite paths; local dev still uses normal paths.
+
+**Blank tab title only:** wrong `base` vs URL (fix `homepage` or `VITE_BASE_PATH`).
+
+**Later (custom domain at `/`):** change `homepage` to that URL (e.g. `https://mesocosm.swecc.org`) or set **`VITE_BASE_PATH=/`**, then redeploy — the app switches back to **BrowserRouter** (no `#` in URLs).
+
+After `npm run build`, **`404.html`** is copied from **`index.html`** so refreshing deep routes works on Pages.
 
 ## Scripts
 
