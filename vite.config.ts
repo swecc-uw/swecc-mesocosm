@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +35,7 @@ function inferBaseFromHomepage(): string {
   }
 }
 
-function viteBase(): string {
+export function viteBase(): string {
   const raw = process.env.VITE_BASE_PATH?.trim();
   if (raw) {
     if (raw === "/") return "/";
@@ -50,9 +50,34 @@ function resolvedBase(): string {
   return viteBase();
 }
 
+function hashRouterBootPlugin(): Plugin {
+  return {
+    name: "mesocosm-hash-router-boot",
+    apply: "build",
+    transformIndexHtml(html, ctx) {
+      if (ctx.server) return html;
+      const base = viteBase();
+      if (base === "/") return html;
+      // If user opens …/repo/ or …/repo with no hash, HashRouter never sees a route — force #/
+      const boot = `(function(){var h=location.hash;if(h&&h.length>1&&h.charAt(1)==="/")return;var p=location.pathname.replace(/\\/index\\.html$/i,"");if(p.slice(-1)!=="/")p+="/";location.replace(p+location.search+"#/");})();`;
+      return {
+        html,
+        tags: [
+          {
+            tag: "script",
+            attrs: {},
+            children: boot,
+            injectTo: "head",
+          },
+        ],
+      };
+    },
+  };
+}
+
 export default defineConfig({
   base: resolvedBase(),
-  plugins: [react()],
+  plugins: [react(), hashRouterBootPlugin()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
   },

@@ -47,6 +47,9 @@ function AppRoutes() {
 }
 
 export function App() {
+  // Hash history pathname is parsed from the hash only (`#/…` → `/…`), not from
+  // `window.location.pathname`, so a GitHub Pages repo basename must NOT be set
+  // here — otherwise stripBasename never matches and no routes render.
   if (useHashRouter()) {
     return (
       <HashRouter>
