@@ -1,0 +1,53 @@
+{
+  "version": "0.1",
+  "language": "en",
+  "ignoreRegExpList": ["/[ˈˌəɒɛɪʊɔɑ·ɐʌᵻꞮ]+/gu"],
+  "words": [
+    "BenchAnything",
+    "bytewise",
+    "Chakara",
+    "chakra",
+    "CNBC",
+    "codediff",
+    "codegen",
+    "csrftoken",
+    "deepseek",
+    "dtype",
+    "elimelt",
+    "Formik",
+    "Glassdoor",
+    "interp",
+    "Jefferies",
+    "Jost",
+    "kwargs",
+    "Leetcode",
+    "mesocosm",
+    "newswire",
+    "NHTSA",
+    "premarket",
+    "pydantic",
+    "relitigate",
+    "sandboxed",
+    "sigils",
+    "Syms",
+    "swecc",
+    "turbopack",
+    "uvicorn",
+    "watchlist",
+    "webarena",
+    "wordmark"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    ".next/**",
+    "out/**",
+    "build/**",
+    "dist/**",
+    "package-lock.json"
+  ],
+  "files": [
+    "src/**/*.{tsx,ts,html,md}",
+    "vite.config.ts",
+    "*.md"
+  ]
+}

@@ -1,39 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mesocosm UI
 
-## Getting Started
+Vite + React + TypeScript SPA (aligned with [swecc-spa-template](https://github.com/swecc-uw/swecc-spa-template) conventions: `npm run dev` / `build` / `lint` / `spellcheck`, GitHub Actions for PR dry-build and Pages deploy).
 
-The UI reads domains from the BenchAnything API (default `http://127.0.0.1:8000`). Start the API from the **repo root** first:
+## Getting started
+
+The UI reads domains from the BenchAnything API (default `http://127.0.0.1:8000`). Start the API from the **monorepo root** first:
 
 ```bash
 cd ..   # repo root
 uv run uvicorn src.api.app:app --reload
 ```
 
-Then install and run the Next app from this directory:
+Then from this directory:
 
 ```bash
-cd ui
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Registered domains (including **draft** ones like `game-2048`) appear on the home page; click a card for detail. Optional: `NEXT_PUBLIC_BENCH_API_URL=http://host:port` in `.env.local` if the API is not on localhost:8000.
+Open [http://localhost:5173](http://localhost:5173). Registered domains appear on the home page; click a card for detail.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create `.env.local` (optional). Vite only exposes variables prefixed with `VITE_`:
 
-## Learn More
+```bash
+VITE_PUBLIC_API_BASE=http://127.0.0.1:8000
+```
 
-To learn more about Next.js, take a look at the following resources:
+(`VITE_PUBLIC_API_URL` is accepted as an alias.) For CI/GitHub Actions, use the `ENV_FILE` secret as in the swecc SPA template.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### GitHub Pages
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+If the site is served from a **project** URL (`https://<user>.github.io/<repo>/`), set `base` in `vite.config.ts` to `'/<repo>/'` before building. For a custom domain at the root (e.g. `mesocosm.swecc.org`), keep `base: '/'` (default).
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Command            | Description           |
+| ------------------ | --------------------- |
+| `npm run dev`      | Vite dev server       |
+| `npm run build`    | `tsc` + production build → `dist/` |
+| `npm run preview`  | Preview production build |
+| `npm run lint`     | ESLint                |
+| `npm run spellcheck` | cspell              |
