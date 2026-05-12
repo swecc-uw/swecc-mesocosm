@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Global ~/.config/husky/init.sh (or Cursor) may append a Cursor co-author trailer.
+# GitHub then lists @cursor-agent as a contributor. Strip it before the commit is recorded.
+msg=${1-}
+[ -n "$msg" ] && [ -f "$msg" ] || exit 0
+tmp=$(mktemp)
+grep -v -E '^Co-authored-by:.*cursoragent@cursor\.com' "$msg" > "$tmp" && mv "$tmp" "$msg"

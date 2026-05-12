@@ -131,23 +131,23 @@ function TypedReasoning({
     return out;
   }, [segments]);
 
-  const [cursor, setCursor] = useState(0);
+  const [revealIndex, setRevealIndex] = useState(0);
 
   useEffect(() => {
-    if (cursor >= flat.length) {
+    if (revealIndex >= flat.length) {
       onDone?.();
       return;
     }
-    const ch = flat[cursor].ch;
+    const ch = flat[revealIndex].ch;
     let delay = 18;
     if (ch === " ") delay = 12;
     if (/[.,—]/.test(ch)) delay = 140;
-    const id = setTimeout(() => setCursor((c) => c + 1), delay);
+    const id = setTimeout(() => setRevealIndex((c) => c + 1), delay);
     return () => clearTimeout(id);
-  }, [cursor, flat, onDone]);
+  }, [revealIndex, flat, onDone]);
 
   const visible: { si: number; style: SegStyle; t: string }[] = [];
-  for (let i = 0; i < cursor; i++) {
+  for (let i = 0; i < revealIndex; i++) {
     const f = flat[i];
     const last = visible[visible.length - 1];
     if (last && last.si === f.si) last.t += f.ch;
