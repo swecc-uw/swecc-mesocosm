@@ -1,15 +1,18 @@
 # Mesocosm UI
 
-Vite + React + TypeScript SPA (aligned with [swecc-spa-template](https://github.com/swecc-uw/swecc-spa-template) conventions: `npm run dev` / `build` / `lint` / `spellcheck`, GitHub Actions for PR dry-build and Pages deploy).
+Vite + React + TypeScript SPA. Frontend for **BenchAnything** — the bench backend lives in the [`swecc-core`](https://github.com/swecc-uw/swecc-core) monorepo under `services/bench/`.
 
 ## Getting started
 
-The UI reads domains from the BenchAnything API (default `http://127.0.0.1:8000`). Start the API from the **monorepo root** first:
+The UI talks to the `bench-api` FastAPI service from the swecc-core monorepo. Bring it up first:
 
 ```bash
-cd ..   # repo root
-uv run uvicorn src.api.app:app --reload
+cd /path/to/swecc-core
+cp .env.example .env   # add ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY etc.
+docker compose up bench-api bench-sandbox
 ```
+
+`bench-api` listens on `http://localhost:8010` by default (port `8000` is taken by `swecc-server`; the host port comes from `BENCH_API_PORT` in swecc-core's `.env`).
 
 Then from this directory:
 
@@ -22,13 +25,35 @@ Open [http://localhost:5173](http://localhost:5173). Registered domains appear o
 
 ### Environment
 
-Create `.env.local` (optional). Vite only exposes variables prefixed with `VITE_`:
+Create `.env.local` (optional) — Vite only exposes variables prefixed with `VITE_`:
 
 ```bash
-VITE_PUBLIC_API_BASE=http://127.0.0.1:8000
+# default (matches BENCH_API_PORT=8010 in swecc-core's .env)
+VITE_PUBLIC_API_BASE=http://localhost:8010
 ```
 
-(`VITE_PUBLIC_API_URL` is accepted as an alias.) For CI/GitHub Actions, use the `ENV_FILE` secret as in the swecc SPA template.
+(`VITE_PUBLIC_API_URL` is accepted as an alias.) See `.env.example` for the full list. For CI / GitHub Actions deploys, populate the **`ENV_FILE`** repo secret as described in the swecc SPA template — its contents are written to `.env.local` before the production build.
+
+In production, point at the path-based prod URL on `api.swecc.org`:
+
+```bash
+VITE_PUBLIC_API_BASE=https://api.swecc.org/bench
+```
+
+bench-api is mounted under `/bench/` on the same gateway that serves the Django backend — no separate subdomain or cert is needed. The bench-api side already ships permissive CORS (`allow_origins=["*"]`), so the SPA on `swecc-uw.github.io` (or wherever it's hosted) can talk to it directly.
+
+### MCP server
+
+The `bench-anything` MCP server (over **Streamable HTTP**) lives in swecc-core at `services/mcp/`. Once `mcp-host` is brought up there:
+
+```bash
+docker compose up mcp-host
+# local (no nginx):  http://localhost:8009/bench-anything/mcp
+# local (with-nginx profile):  http://localhost/mcp/bench-anything/mcp
+# production:                  https://api.swecc.org/mcp/bench-anything/mcp
+```
+
+Any MCP-capable harness (Cursor, Claude Code, Continue, custom agent) can connect by URL — no need to spawn a local subprocess. Point its `BENCH_ANYTHING_BASE_URL` env at whichever bench-api you want it to drive (the local `http://swecc-bench-api:8000` inside the compose network, or `https://api.swecc.org/bench` from outside).
 
 ### GitHub Pages
 

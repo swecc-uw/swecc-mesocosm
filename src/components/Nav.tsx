@@ -2,6 +2,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/ds/ThemeToggle";
+import { API_BASE } from "@/lib/env";
 
 export default function Nav() {
   const pathname = useLocation().pathname;
@@ -51,7 +52,7 @@ export default function Nav() {
           {link("/showcase", "Showcase")}
           {link("/developer", "Developer")}
           <a
-            href="http://localhost:8000/docs"
+            href={`${API_BASE}/docs`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-ink-2 hover:text-ink transition-colors"

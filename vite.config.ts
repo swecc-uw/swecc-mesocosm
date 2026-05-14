@@ -1,10 +1,19 @@
 import { readFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Vite's dep optimizer does atomic-rename writes into `.vite/deps_temp_*`.
+ * If the project lives on a non-POSIX filesystem (e.g. exfat external drive)
+ * that rename intermittently fails with EACCES and the page never hydrates.
+ * Point `cacheDir` at the system tmp dir, which is always APFS on macOS.
+ */
+const cacheDir = path.join(os.tmpdir(), "vite-cache-swecc-mesocosm");
 
 const pkg = JSON.parse(
   readFileSync(path.join(__dirname, "package.json"), "utf8"),
@@ -77,6 +86,7 @@ function hashRouterBootPlugin(): Plugin {
 
 export default defineConfig({
   base: resolvedBase(),
+  cacheDir,
   plugins: [react(), hashRouterBootPlugin()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },

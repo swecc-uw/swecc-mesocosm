@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { Btn } from "@/components/ds/Btn";
 import { FullBenchResult, TestBenchResult } from "@/components/BenchResultPanel";
+import { API_BASE } from "@/lib/env";
 
 const STATUS_TONE: Record<string, { label: string; tone: string }> = {
   pending:  { label: "pending",  tone: "text-ink-3" },
@@ -231,18 +232,26 @@ function EnvironmentCard({
         <StatusBadge status={env.status} />
       </div>
 
-      {/* GitHub link */}
-      <a
-        href={env.github_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-xs text-ink-3 hover:text-leaf-deep transition-colors truncate max-w-full mb-4 num-tab"
-      >
-        <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-        </svg>
-        {env.github_url.replace(/^https?:\/\/(www\.)?github\.com\//, "")}
-      </a>
+      {/* Provenance — github link when cloned from a repo, "via API / MCP"
+          badge when the row was mirrored from a direct POST /v1/domains call
+          (bench-api sets github_url="" for that case). */}
+      {env.github_url ? (
+        <a
+          href={env.github_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-ink-3 hover:text-leaf-deep transition-colors truncate max-w-full mb-4 num-tab"
+        >
+          <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+          </svg>
+          {env.github_url.replace(/^https?:\/\/(www\.)?github\.com\//, "")}
+        </a>
+      ) : (
+        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-ink-3 mb-4 px-2 py-0.5 border border-line rounded-[2px] bg-paper-2">
+          registered via API / MCP
+        </span>
+      )}
 
       {/* Error message — expandable to show full stderr */}
       {env.error_message && (
@@ -447,7 +456,7 @@ function FormInput({ label, required, type = "text", value, onChange, placeholde
 
 function ApiSnippet() {
   const [copied, setCopied] = useState(false);
-  const snippet = `curl -X POST http://localhost:8000/v1/developer/environments \\
+  const snippet = `curl -X POST ${API_BASE}/v1/developer/environments \\
   -H "Content-Type: application/json" \\
   -d '{
     "owner_id": "your-handle",
@@ -614,7 +623,7 @@ export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardPr
             POST to the developer endpoint from CI/CD. Requires a <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at repo root.
           </p>
           <a
-            href="http://localhost:8000/docs#/developer"
+            href={`${API_BASE}/docs#/developer`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.16em] text-ink hover:text-leaf-deep transition-colors"

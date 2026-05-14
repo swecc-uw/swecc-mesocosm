@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Domain, LeaderboardEntry, publishDomain } from "@/lib/api";
+import { API_BASE } from "@/lib/env";
 import { Sigil } from "@/components/ds/Sigil";
 import TagBadge from "./TagBadge";
 import BenchEnvToggle, { Mode } from "./BenchEnvToggle";
@@ -273,7 +274,7 @@ function EnvPanel({ domain }: { domain: Domain }) {
 }`}
         </pre>
         <a
-          href="http://localhost:8000/docs#/runs/create_run_v1_runs_post"
+          href={`${API_BASE}/docs#/runs/create_run_v1_runs_post`}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-4 inline-flex items-center gap-1.5 text-sm text-ink hover:text-leaf-deep transition-colors"
