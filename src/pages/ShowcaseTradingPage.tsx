@@ -32,6 +32,7 @@ export function ShowcaseTradingPage() {
   }, []);
 
   return (
+    <>
     <div className="max-w-3xl mx-auto px-6 py-12">
       <nav className="mb-8">
         <Link
@@ -88,13 +89,12 @@ export function ShowcaseTradingPage() {
           model thinks, an order ships, the tape moves.
         </p>
       </section>
-
-      <div className="mt-8 -mx-6">
-        <div className="px-6">
-          <Trading />
-        </div>
-      </div>
     </div>
+
+    <div className="sc-tr-sim-wrap px-6 pb-12">
+      <Trading />
+    </div>
+    </>
   );
 }
 

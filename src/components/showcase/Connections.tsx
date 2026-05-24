@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── Puzzle data ─────────────────────────────────────────────────────
 type CategoryId = "pizza" | "blades" | "hire" | "stains";
@@ -132,10 +132,19 @@ function TypedReasoning({
   }, [segments]);
 
   const [revealIndex, setRevealIndex] = useState(0);
+  const onDoneRef = useRef(onDone);
+  const doneCalledRef = useRef(false);
+
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
     if (revealIndex >= flat.length) {
-      onDone?.();
+      if (!doneCalledRef.current) {
+        doneCalledRef.current = true;
+        onDoneRef.current?.();
+      }
       return;
     }
     const ch = flat[revealIndex].ch;
@@ -144,7 +153,7 @@ function TypedReasoning({
     if (/[.,—]/.test(ch)) delay = 140;
     const id = setTimeout(() => setRevealIndex((c) => c + 1), delay);
     return () => clearTimeout(id);
-  }, [revealIndex, flat, onDone]);
+  }, [revealIndex, flat]);
 
   const visible: { si: number; style: SegStyle; t: string }[] = [];
   for (let i = 0; i < revealIndex; i++) {
@@ -254,43 +263,75 @@ function TurnSection({
     }
   }, [phase, index, onDone, turn.autoResolve]);
 
-  // Phase transitions.
+  const handleReasoningDone = useCallback(() => {
+    setSelected([]);
+    setPhase((p) => (p === "reasoning" ? "selecting" : p));
+  }, []);
+
   useEffect(() => {
-    if (phase === "thinking") {
-      const id = setTimeout(() => setPhase("reasoning"), 1400);
-      return () => clearTimeout(id);
-    }
-    if (phase === "selecting") {
-      let i = 0;
-      const id = setInterval(() => {
-        setSelected((s) => [...s, turn.guess[i]]);
-        i++;
-        if (i >= turn.guess.length) {
-          clearInterval(id);
-          setTimeout(() => setPhase("reacting"), 650);
-        }
-      }, 280);
-      return () => clearInterval(id);
-    }
-    if (phase === "reacting") {
-      if (turn.result === "wrong") {
-        queueMicrotask(() => setWrongFlash(true));
-        setTimeout(() => setShowOneAway(true), 500);
+    if (phase !== "thinking") return;
+    const id = setTimeout(() => setPhase("reasoning"), 1400);
+    return () => clearTimeout(id);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "selecting") return;
+    let cancelled = false;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    turn.guess.forEach((word, i) => {
+      timeouts.push(
+        setTimeout(() => {
+          if (cancelled) return;
+          setSelected((prev) => [...prev, word]);
+          if (i === turn.guess.length - 1) {
+            timeouts.push(
+              setTimeout(() => {
+                if (!cancelled) setPhase("reacting");
+              }, 650),
+            );
+          }
+        }, 280 * (i + 1)),
+      );
+    });
+
+    return () => {
+      cancelled = true;
+      timeouts.forEach(clearTimeout);
+    };
+  }, [phase, turn.guess]);
+
+  useEffect(() => {
+    if (phase !== "reacting") return;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    if (turn.result === "wrong") {
+      queueMicrotask(() => setWrongFlash(true));
+      timeouts.push(setTimeout(() => setShowOneAway(true), 500));
+      timeouts.push(
         setTimeout(() => {
           setWrongFlash(false);
           setSelected([]);
-          setTimeout(() => setShowOneAway(false), 700);
-          setPhase("done");
-        }, 1800);
-      } else {
-        setTimeout(() => setFadingOut([...turn.guess]), 400);
+          timeouts.push(
+            setTimeout(() => {
+              setShowOneAway(false);
+              setPhase("done");
+            }, 700),
+          );
+        }, 1800),
+      );
+    } else {
+      timeouts.push(setTimeout(() => setFadingOut([...turn.guess]), 400));
+      timeouts.push(
         setTimeout(() => {
           setSolvedDuringThis(true);
           setPhase("done");
-        }, 1100);
-      }
+        }, 1100),
+      );
     }
-  }, [phase, turn]);
+
+    return () => timeouts.forEach(clearTimeout);
+  }, [phase, turn.guess, turn.result]);
 
   useEffect(() => {
     if (phase === "done" && turn.autoResolve && !autoResolved) {
@@ -312,6 +353,10 @@ function TurnSection({
     solvedDuringThis && turn.solves
       ? remaining.filter((w) => !CATEGORIES[turn.solves!].words.includes(w))
       : remaining;
+  const boardRemaining =
+    phase === "done" && solvedDuringThis && turn.solves
+      ? finalRemaining
+      : remaining;
 
   return (
     <section ref={ref} className="sc-turn sc-visible">
@@ -330,7 +375,7 @@ function TurnSection({
 
       <SolvedRows ids={solvedIds} />
       <Board
-        remaining={finalRemaining}
+        remaining={boardRemaining}
         selected={selected}
         wrongFlash={wrongFlash}
         fadingOut={fadingOut}
@@ -353,10 +398,9 @@ function TurnSection({
         <>
           <div className="sc-action-line">Reasoning</div>
           <TypedReasoning
+            key={turn.reasoning.map((s) => s.t).join(" ")}
             segments={turn.reasoning}
-            onDone={() => {
-              if (phase === "reasoning") setPhase("selecting");
-            }}
+            onDone={handleReasoningDone}
           />
         </>
       )}

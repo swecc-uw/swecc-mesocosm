@@ -145,6 +145,8 @@
   40% { opacity: 1; transform: scale(1); }
 }
 .sc-thinking-label {
+  flex: 1;
+  min-width: 0;
   font-family: var(--f-body); font-size: 10.5px; font-weight: 500;
   color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.16em;
@@ -292,6 +294,11 @@
 /* ═══════════════════════════════════════════════════════════════════
    TRADING — three-column trading floor + chart logic
    ═══════════════════════════════════════════════════════════════════ */
+.sc-tr-sim-wrap {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
 .sc-tr-stage {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 320px;
@@ -486,8 +493,9 @@
 }
 
 /* Turns column */
-.sc-tr-body { display: flex; flex-direction: column; }
+.sc-tr-body { display: flex; flex-direction: column; min-width: 0; }
 .sc-tr-turn {
+  min-width: 0;
   padding: 40px 0 48px;
   border-top: 1px solid var(--line);
   opacity: 0;
@@ -500,8 +508,11 @@
 
 .sc-tr-turn-head {
   display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 16px;
   margin-bottom: 24px;
 }
+.sc-tr-turn-head > div { min-width: 0; }
 .sc-tr-turn-num {
   font-family: var(--f-display); font-style: italic; font-weight: 500;
   font-size: 28px; letter-spacing: -0.02em;
@@ -514,6 +525,8 @@
   letter-spacing: 0.06em;
 }
 .sc-tr-turn-status {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-family: var(--f-body); font-size: 10px; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.18em;
 }
@@ -523,7 +536,8 @@
   font-size: 19px; line-height: 1.5;
   color: var(--ink); letter-spacing: -0.005em;
   padding: 10px 0 18px;
-  max-width: 56ch;
+  width: 100%;
+  max-width: min(56ch, 100%);
 }
 .sc-tr-reasoning em { font-style: italic; color: var(--leaf-deep); font-weight: 500; }
 .sc-tr-reasoning .sc-word-caps {

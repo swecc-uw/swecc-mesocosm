@@ -405,15 +405,28 @@ function TypedReasoning({
     return out;
   }, [segments]);
   const [revealIndex, setRevealIndex] = useState(0);
+  const onDoneRef = useRef(onDone);
+  const doneCalledRef = useRef(false);
+
   useEffect(() => {
-    if (revealIndex >= flat.length) { onDone?.(); return; }
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
+  useEffect(() => {
+    if (revealIndex >= flat.length) {
+      if (!doneCalledRef.current) {
+        doneCalledRef.current = true;
+        onDoneRef.current?.();
+      }
+      return;
+    }
     const ch = flat[revealIndex].ch;
     let delay = 14;
     if (ch === " ") delay = 8;
     if (/[.,—]/.test(ch)) delay = 110;
     const id = setTimeout(() => setRevealIndex((c) => c + 1), delay);
     return () => clearTimeout(id);
-  }, [revealIndex, flat, onDone]);
+  }, [revealIndex, flat]);
   const visible: { si: number; style: SegStyle; t: string }[] = [];
   for (let i = 0; i < revealIndex; i++) {
     const f = flat[i];
