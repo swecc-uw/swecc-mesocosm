@@ -1,6 +1,6 @@
 {
   "name": "swecc-mesocosm",
-  "homepage": "https://swecc-uw.github.io/swecc-mesocosm/",
+  "homepage": "https://mesocosm.swecc.org/",
   "private": true,
   "version": "0.1.0",
   "type": "module",

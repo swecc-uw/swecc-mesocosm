@@ -53,7 +53,7 @@ export function viteBase(): string {
   return inferBaseFromHomepage();
 }
 
-/** Local dev at `/`; production build + `vite preview` match GitHub Pages URL. */
+/** Local dev at `/`; production build + `vite preview` use `homepage` (e.g. mesocosm.swecc.org → `/`). */
 function resolvedBase(): string {
   if (process.env.npm_lifecycle_event === "dev") return "/";
   return viteBase();
