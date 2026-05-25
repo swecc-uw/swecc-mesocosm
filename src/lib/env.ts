@@ -17,3 +17,15 @@ function readApiBase(): string {
 }
 
 export const API_BASE = readApiBase();
+
+/** Django swecc-server (session auth). Same host as engagement — not under `/bench`. */
+const PRODUCTION_AUTH_API_BASE = "https://api.swecc.org";
+
+function readAuthApiBase(): string {
+  const fromEnv = import.meta.env.VITE_AUTH_API_BASE;
+  if (typeof fromEnv === "string" && fromEnv.trim()) return fromEnv.trim().replace(/\/+$/, "");
+  if (import.meta.env.DEV) return "http://localhost:8000";
+  return PRODUCTION_AUTH_API_BASE;
+}
+
+export const AUTH_API_BASE = readAuthApiBase();

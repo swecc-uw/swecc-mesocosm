@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Domain, LeaderboardEntry, publishDomain } from "@/lib/api";
+import { Domain, LeaderboardEntry, publishDomain, unpublishDomain } from "@/lib/api";
 import { API_BASE } from "@/lib/env";
 import { Sigil } from "@/components/ds/Sigil";
 import TagBadge from "./TagBadge";
@@ -23,6 +23,7 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
   const [domain, setDomain] = useState<Domain>(initialDomain);
   const [mode, setMode] = useState<Mode>("bench");
   const [publishing, setPublishing] = useState(false);
+  const [unpublishing, setUnpublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
   async function handlePublish() {
@@ -35,6 +36,19 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
       setPublishError(e instanceof Error ? e.message : "Failed to publish");
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function handleUnpublish() {
+    setUnpublishing(true);
+    setPublishError(null);
+    try {
+      const updated = await unpublishDomain(domain.id);
+      setDomain(updated);
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : "Failed to unpublish");
+    } finally {
+      setUnpublishing(false);
     }
   }
 
@@ -109,10 +123,19 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
             {domain.status === "draft" && (
               <button
                 onClick={handlePublish}
-                disabled={publishing}
+                disabled={publishing || unpublishing}
                 className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-leaf-deep bg-leaf-tint text-leaf-deep hover:bg-leaf-deep hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {publishing ? "Publishing…" : "Publish →"}
+              </button>
+            )}
+            {domain.status === "published" && (
+              <button
+                onClick={handleUnpublish}
+                disabled={publishing || unpublishing}
+                className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-line text-ink-2 hover:border-bad hover:text-bad transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {unpublishing ? "Unpublishing…" : "Unpublish"}
               </button>
             )}
           </div>

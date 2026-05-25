@@ -233,12 +233,13 @@ export interface TestBenchRequest {
   seed?: number;
 }
 
+/** Must match swecc-core bench_common.model_catalog.FULL_BENCH_MODELS (gemini/ prefix). */
 export const SUPPORTED_MODELS: { id: string; label: string }[] = [
   { id: "anthropic/claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-  { id: "openai/gpt-4o",               label: "GPT-4o" },
-  { id: "google/gemini-2.0-flash",     label: "Gemini 2.0 Flash" },
-  { id: "deepseek/deepseek-chat",      label: "DeepSeek Chat" },
-  { id: "xai/grok-2",                  label: "Grok 2" },
+  { id: "openai/gpt-4o", label: "GPT-4o" },
+  { id: "gemini/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
+  { id: "deepseek/deepseek-chat", label: "DeepSeek Chat" },
+  { id: "xai/grok-2", label: "Grok 2" },
 ];
 
 export interface DomainUsageStats {
@@ -258,6 +259,7 @@ export interface DeveloperEnvironmentWithUsage extends DeveloperEnvironment {
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
+    credentials: "include",
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
     cache: "no-store",
   });
@@ -346,6 +348,7 @@ export async function retryEnvironment(envId: string): Promise<DeveloperEnvironm
 export async function deleteEnvironment(envId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/v1/developer/environments/${encodeURIComponent(envId)}`, {
     method: "DELETE",
+    credentials: "include",
     cache: "no-store",
   });
   if (!res.ok && res.status !== 204) {
@@ -356,6 +359,13 @@ export async function deleteEnvironment(envId: string): Promise<void> {
 export async function publishDomain(domainId: string): Promise<Domain> {
   return getJson<Domain>(
     `/v1/domains/${encodeURIComponent(domainId)}/publish`,
+    { method: "POST" },
+  );
+}
+
+export async function unpublishDomain(domainId: string): Promise<Domain> {
+  return getJson<Domain>(
+    `/v1/domains/${encodeURIComponent(domainId)}/unpublish`,
     { method: "POST" },
   );
 }

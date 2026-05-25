@@ -13,6 +13,8 @@ import { ShowcasePage } from "./pages/ShowcasePage";
 import { ShowcaseConnectionsPage } from "./pages/ShowcaseConnectionsPage";
 import { ShowcaseTradingPage } from "./pages/ShowcaseTradingPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { AuthPage } from "./pages/AuthPage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 /** Vite `BASE_URL` ends with `/`; React Router `basename` must not. */
 function routerBasename(): string | undefined {
@@ -34,7 +36,15 @@ function AppRoutes() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
-        <Route path="developer" element={<DeveloperPage />} />
+        <Route path="auth" element={<AuthPage />} />
+        <Route
+          path="developer"
+          element={
+            <ProtectedRoute>
+              <DeveloperPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="domains/:id" element={<DomainDetailPage />} />
         <Route path="showcase" element={<ShowcasePage />} />
         <Route path="showcase/connections" element={<ShowcaseConnectionsPage />} />

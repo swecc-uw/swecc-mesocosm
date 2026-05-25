@@ -3,9 +3,11 @@
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/ds/ThemeToggle";
 import { API_BASE } from "@/lib/env";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Nav() {
   const pathname = useLocation().pathname;
+  const { isAuthenticated, isVerified, member, loading, logout } = useAuth();
 
   const link = (href: string, label: string) => {
     const active =
@@ -59,6 +61,29 @@ export default function Nav() {
           >
             API Docs
           </a>
+          {!loading && isAuthenticated && isVerified && member ? (
+            <>
+              <span className="text-sm text-ink-2 hidden sm:inline">{member.username}</span>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="text-sm text-ink-2 hover:text-ink transition-colors"
+              >
+                Sign out
+              </button>
+            </>
+          ) : !loading ? (
+            <Link
+              to="/auth"
+              className={`text-sm transition-colors ${
+                pathname === "/auth"
+                  ? "text-ink font-medium"
+                  : "text-ink-2 hover:text-ink"
+              }`}
+            >
+              Sign in
+            </Link>
+          ) : null}
           <ThemeToggle />
         </nav>
       </div>

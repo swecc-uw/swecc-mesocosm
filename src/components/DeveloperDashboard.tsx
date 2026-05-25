@@ -10,11 +10,13 @@ import {
   Episode,
   getBenchJobs,
   getDevBenchStatus,
+  getDomain,
   pollEnvStatus,
   retryEnvironment,
   startFullBench,
   submitDeveloperEnvironment,
   testBench,
+  unpublishDomain,
   SUPPORTED_MODELS,
 } from "@/lib/api";
 import { Btn } from "@/components/ds/Btn";
@@ -155,6 +157,8 @@ function EnvironmentCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [domainStatus, setDomainStatus] = useState<string | null>(null);
   const [errorExpanded, setErrorExpanded] = useState(false);
 
   const created = new Date(env.created_at).toLocaleDateString("en-US", {
@@ -163,6 +167,28 @@ function EnvironmentCard({
   const avgScore = usage?.avg_score != null ? usage.avg_score.toFixed(3) : null;
   const bestScore = usage?.best_score != null ? usage.best_score.toFixed(3) : null;
   const canRetry = env.status === "failed" || env.status === "pending";
+
+  useEffect(() => {
+    if (!env.domain_id) return;
+    let alive = true;
+    getDomain(env.domain_id)
+      .then((d) => { if (alive) setDomainStatus(d.status); })
+      .catch(() => { if (alive) setDomainStatus(null); });
+    return () => { alive = false; };
+  }, [env.domain_id]);
+
+  async function handleUnpublish() {
+    if (!env.domain_id) return;
+    setUnpublishing(true);
+    try {
+      const updated = await unpublishDomain(env.domain_id);
+      setDomainStatus(updated.status);
+    } catch {
+      // keep published state on failure
+    } finally {
+      setUnpublishing(false);
+    }
+  }
 
   async function handleRetry() {
     setRetrying(true);
@@ -288,12 +314,24 @@ function EnvironmentCard({
       {/* Action row */}
       <div className="mt-4 flex items-center gap-3 flex-wrap">
         {env.status === "ready" && env.domain_id && (
-          <Link
-            to={`/domains/${env.domain_id}`}
-            className="text-xs text-ink-2 hover:text-leaf-deep transition-colors uppercase tracking-[0.14em]"
-          >
-            View domain →
-          </Link>
+          <>
+            <Link
+              to={`/domains/${env.domain_id}`}
+              className="text-xs text-ink-2 hover:text-leaf-deep transition-colors uppercase tracking-[0.14em]"
+            >
+              View domain →
+            </Link>
+            {domainStatus === "published" && (
+              <Btn
+                variant="link"
+                onClick={handleUnpublish}
+                disabled={unpublishing}
+                className={unpublishing ? "opacity-40 cursor-not-allowed text-bad" : "text-bad hover:text-bad/70"}
+              >
+                {unpublishing ? "Unpublishing…" : "Unpublish"}
+              </Btn>
+            )}
+          </>
         )}
 
         {env.status === "ready" && (
@@ -361,21 +399,34 @@ function EnvironmentCard({
 
 // ── Submit form ────────────────────────────────────────────────────────────────
 
-function SubmitForm({ onSubmit }: { onSubmit: (env: DeveloperEnvironment) => void }) {
+function SubmitForm({
+  ownerHandle,
+  onSubmit,
+}: {
+  ownerHandle: string;
+  onSubmit: (env: DeveloperEnvironment) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ owner_id: "", name: "", description: "", github_url: "" });
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    github_url: "",
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      const env = await submitDeveloperEnvironment(form);
+      const env = await submitDeveloperEnvironment({
+        ...form,
+        owner_id: ownerHandle,
+      });
       onSubmit(env);
       setOpen(false);
-      setForm({ owner_id: "", name: "", description: "", github_url: "" });
+      setForm({ name: "", description: "", github_url: "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed");
     } finally {
@@ -402,7 +453,14 @@ function SubmitForm({ onSubmit }: { onSubmit: (env: DeveloperEnvironment) => voi
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <FormInput label="your id / handle" required value={form.owner_id} onChange={(v) => setForm((f) => ({ ...f, owner_id: v }))} placeholder="acme-corp" />
+          <div>
+            <label className="eyebrow mb-1.5 block">your id / handle</label>
+            <input
+              readOnly
+              value={ownerHandle}
+              className="w-full px-3 py-2 text-sm bg-paper-2 border border-line rounded-[2px] text-ink-2 cursor-default"
+            />
+          </div>
           <FormInput label="environment name" required value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="my coding bench" />
         </div>
         <FormInput
@@ -488,9 +546,10 @@ function ApiSnippet() {
 
 interface DeveloperDashboardProps {
   initialEnvs: DeveloperEnvironment[];
+  ownerHandle: string;
 }
 
-export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardProps) {
+export default function DeveloperDashboard({ initialEnvs, ownerHandle }: DeveloperDashboardProps) {
   const [envs, setEnvs] = useState<DeveloperEnvironment[]>(initialEnvs);
   const [filterOwner, setFilterOwner] = useState("");
   const [devBenchBusy, setDevBenchBusy] = useState(false);
@@ -601,7 +660,7 @@ export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardPr
         <StatPanel value={pendingCount} label="pending · processing" />
       </div>
 
-      <SubmitForm onSubmit={handleNewEnv} />
+      <SubmitForm ownerHandle={ownerHandle} onSubmit={handleNewEnv} />
 
       <div className="mb-10 grid grid-cols-2 gap-6">
         <div className="border border-line rounded-[2px] bg-paper-2 p-5">
