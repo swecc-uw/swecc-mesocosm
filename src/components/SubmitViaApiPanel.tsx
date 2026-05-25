@@ -1,12 +1,9 @@
 import { useState } from "react";
-import {
-  API_BASE,
-  AUTH_API_BASE,
-  PRODUCTION_API_BASE,
-  PRODUCTION_AUTH_API_BASE,
-} from "@/lib/env";
+import { PRODUCTION_API_BASE } from "@/lib/env";
 
-type TabId = "curl-prod" | "curl-local" | "cli";
+const CLI_INSTALL = "pip install swecc-mesocosm";
+
+type TabId = "cli" | "curl";
 
 function SnippetBlock({
   label,
@@ -43,88 +40,55 @@ function SnippetBlock({
   );
 }
 
-function prodCurlSnippet(): string {
-  return `# 1) Member JWT via swecc-server (same auth as mesocosm / engagement)
-SERVER=${PRODUCTION_AUTH_API_BASE}
-BENCH=${PRODUCTION_API_BASE}
+function cliSnippet(): string {
+  return `# One-time install (PyPI)
+${CLI_INSTALL}
 
-CSRF=$(curl -s -c bench-cookies.txt "$SERVER/auth/csrf/" -D - -o /dev/null | tr -d '\\r' | grep -i x-csrftoken | awk '{print $2}')
-curl -s -b bench-cookies.txt -c bench-cookies.txt -X POST "$SERVER/auth/login/" \\
-  -H "Content-Type: application/json" -H "X-CSRFToken: $CSRF" \\
-  -d '{"username":"YOUR_USER","password":"YOUR_PASSWORD"}'
+# Defaults: api.swecc.org + /bench (override with SWECC_SERVER_URL / SWECC_BENCH_URL)
+bench auth login --username YOUR_USER --password YOUR_PASSWORD
 
-TOKEN=$(curl -s -b bench-cookies.txt "$SERVER/auth/jwt/" | jq -r .token)
-
-# 2) Submit environment (repo must have benchanything.json at root)
-curl -X POST "$BENCH/v1/developer/environments" \\
-  -H "Authorization: Bearer $TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "name": "FWT Tic Tac Toe",
-    "github_url": "https://github.com/FWT-bs/environments",
-    "description": "Tic-tac-toe env with benchanything.json at repo root"
-  }'`;
-}
-
-function localCurlSnippet(): string {
-  return `# Local stack (docker compose --profile with-nginx up)
-SERVER=${AUTH_API_BASE}
-BENCH=${API_BASE}
-
-CSRF=$(curl -s -c bench-cookies.txt "$SERVER/auth/csrf/" -D - -o /dev/null | tr -d '\\r' | grep -i x-csrftoken | awk '{print $2}')
-curl -s -b bench-cookies.txt -c bench-cookies.txt -X POST "$SERVER/auth/login/" \\
-  -H "Content-Type: application/json" -H "X-CSRFToken: $CSRF" \\
-  -d '{"username":"YOUR_USER","password":"YOUR_PASSWORD"}'
-
-TOKEN=$(curl -s -b bench-cookies.txt "$SERVER/auth/jwt/" | jq -r .token)
-
-curl -X POST "$BENCH/v1/developer/environments" \\
-  -H "Authorization: Bearer $TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "name": "FWT Tic Tac Toe",
-    "github_url": "https://github.com/FWT-bs/environments",
-    "description": "Tic-tac-toe env with benchanything.json at repo root"
-  }'`;
-}
-
-function prodCliSnippet(): string {
-  return `# Install CLI from swecc-core (once):
-#   cd services/bench/common && pip install -e .
-
-bench --bench-url ${PRODUCTION_API_BASE} auth login \\
-  --server-url ${PRODUCTION_AUTH_API_BASE} \\
-  --username YOUR_USER --password YOUR_PASSWORD
-
-bench --bench-url ${PRODUCTION_API_BASE} env submit \\
+bench env submit \\
   --name "FWT Tic Tac Toe" \\
   --github-url "https://github.com/FWT-bs/environments" \\
   --description "Tic-tac-toe env with benchanything.json at repo root"
 
-# Optional: credit submission to a team you belong to
-# bench --bench-url ${PRODUCTION_API_BASE} team use TEAM_UUID
-# bench --bench-url ${PRODUCTION_API_BASE} env submit ...`;
+# Optional: attribute env to your active team
+# bench team use TEAM_UUID
+# bench env submit ...`;
 }
 
-function localCliSnippet(): string {
-  return `bench --bench-url ${API_BASE} auth login \\
-  --server-url ${AUTH_API_BASE} \\
-  --username YOUR_USER --password YOUR_PASSWORD
+function curlSnippet(): string {
+  return `# curl needs a Bearer token — get it from the bench CLI (no manual CSRF/JWT dance)
 
-bench --bench-url ${API_BASE} env submit \\
-  --name "FWT Tic Tac Toe" \\
-  --github-url "https://github.com/FWT-bs/environments" \\
-  --description "Tic-tac-toe env with benchanything.json at repo root"`;
+# 1) Install + log in (saves session to ~/.config/swecc/bench_credentials.json)
+${CLI_INSTALL}
+bench auth login --username YOUR_USER --password YOUR_PASSWORD
+
+# 2) Export JWT for this shell (run again after logout or if you get 401)
+export TOKEN=$(bench auth token)
+# optional: bench auth token          # print token to stdout
+# optional: echo "$TOKEN" | head -c 24 && echo "..."
+
+# 3) Point curl at production bench-api
+export BENCH=${PRODUCTION_API_BASE}
+
+# 4) Submit environment
+curl -X POST "$BENCH/v1/developer/environments" \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "FWT Tic Tac Toe",
+    "github_url": "https://github.com/FWT-bs/environments",
+    "description": "Tic-tac-toe env with benchanything.json at repo root"
+  }'`;
 }
 
 export function SubmitViaApiPanel() {
-  const showLocal = import.meta.env.DEV;
+  const [tab, setTab] = useState<TabId>("cli");
   const tabs: { id: TabId; label: string }[] = [
-    { id: "curl-prod", label: "curl · production" },
-    ...(showLocal ? [{ id: "curl-local" as const, label: "curl · local" }] : []),
     { id: "cli", label: "bench CLI" },
+    { id: "curl", label: "curl · advanced" },
   ];
-  const [tab, setTab] = useState<TabId>("curl-prod");
 
   return (
     <div className="space-y-3">
@@ -153,25 +117,29 @@ export function SubmitViaApiPanel() {
         </a>
       </div>
 
-      {tab === "curl-prod" && (
-        <SnippetBlock label="production · curl" snippet={prodCurlSnippet()} />
-      )}
-      {tab === "curl-local" && showLocal && (
-        <SnippetBlock label="local dev · curl" snippet={localCurlSnippet()} />
-      )}
-      {tab === "cli" && (
-        <div className="space-y-4">
-          <SnippetBlock label="production · bench CLI" snippet={prodCliSnippet()} />
-          {showLocal && (
-            <SnippetBlock label="local dev · bench CLI" snippet={localCliSnippet()} />
-          )}
-        </div>
+      {tab === "cli" && <SnippetBlock label="production · bench CLI" snippet={cliSnippet()} />}
+      {tab === "curl" && (
+        <SnippetBlock label="production · curl + CLI token" snippet={curlSnippet()} />
       )}
 
       <p className="text-xs text-ink-3 leading-relaxed">
-        Member login is required. Optional <code className="font-mono bg-paper-2 px-1 rounded">team_id</code>{" "}
-        in the JSON body (or <code className="font-mono bg-paper-2 px-1 rounded">bench team use</code>)
-        attributes the env to your active team.
+        {tab === "curl" ? (
+          <>
+            Curl cannot read the CLI credential file — you must{" "}
+            <code className="font-mono bg-paper-2 px-1 rounded">bench auth login</code> first, then{" "}
+            <code className="font-mono bg-paper-2 px-1 rounded">export TOKEN=$(bench auth token)</code>{" "}
+            in every new terminal. Re-run login + export if you get{" "}
+            <code className="font-mono bg-paper-2 px-1 rounded">401</code>.
+          </>
+        ) : (
+          <>
+            The <code className="font-mono bg-paper-2 px-1 rounded">bench</code> CLI is the
+            supported path for submit, teams, and runs. It stores your session locally (
+            <code className="font-mono bg-paper-2 px-1 rounded">~/.config/swecc/bench_credentials.json</code>
+            ) and defaults to production URLs — no{" "}
+            <code className="font-mono bg-paper-2 px-1 rounded">--bench-url</code> flags needed.
+          </>
+        )}
       </p>
     </div>
   );

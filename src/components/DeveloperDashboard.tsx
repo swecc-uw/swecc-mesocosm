@@ -704,18 +704,20 @@ export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardPr
         </div>
         <div className="border border-line rounded-[2px] bg-paper-2 p-5">
           <h3 className="text-lg font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
-            Via <em>API / CLI.</em>
+            Via <em>CLI.</em>
           </h3>
           <p className="text-sm text-ink-2 mt-2 leading-relaxed">
-            Use <code className="text-xs font-mono bg-paper px-1 rounded">curl</code> or the{" "}
-            <code className="text-xs font-mono bg-paper px-1 rounded">bench</code> CLI from CI or
-            your terminal. Requires <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at repo root.
+            Install the <code className="text-xs font-mono bg-paper px-1 rounded">bench</code> CLI
+            with <code className="text-xs font-mono bg-paper px-1 rounded">pip install swecc-mesocosm</code>{" "}
+            for CI or your terminal — production URLs are built in. Requires{" "}
+            <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at
+            repo root.
           </p>
         </div>
       </div>
 
       <section className="mb-12 border border-line rounded-[2px] bg-paper p-6">
-        <h2 className="eyebrow mb-4">Submit via API or CLI</h2>
+        <h2 className="eyebrow mb-4">Submit via CLI</h2>
         <SubmitViaApiPanel />
       </section>
 
