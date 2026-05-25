@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { listDeveloperEnvironments, type DeveloperEnvironment } from "@/lib/api";
 import DeveloperDashboard from "@/components/DeveloperDashboard";
-import { useAuth } from "@/hooks/useAuth";
-
 export function DeveloperPage() {
-  const { member } = useAuth();
   const [envs, setEnvs] = useState<DeveloperEnvironment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -16,7 +13,7 @@ export function DeveloperPage() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await listDeveloperEnvironments(member?.username);
+        const list = await listDeveloperEnvironments();
         if (!cancelled) setEnvs(list);
       } catch {
         if (!cancelled) setEnvs([]);
@@ -27,7 +24,7 @@ export function DeveloperPage() {
     return () => {
       cancelled = true;
     };
-  }, [member?.username]);
+  }, []);
 
   if (loading) {
     return (
@@ -37,5 +34,5 @@ export function DeveloperPage() {
     );
   }
 
-  return <DeveloperDashboard initialEnvs={envs} ownerHandle={member?.username ?? ""} />;
+  return <DeveloperDashboard initialEnvs={envs} />;
 }

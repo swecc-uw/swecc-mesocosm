@@ -10,7 +10,11 @@ import {
   Run,
   SUPPORTED_MODELS,
 } from "@/lib/api";
+import { BenchAccessGate } from "@/components/BenchAccessGate";
+import { SubmittingAsBanner } from "@/components/SubmittingAsBanner";
 import { Btn } from "@/components/ds/Btn";
+import { useBenchAuth } from "@/hooks/useBenchAuth";
+import { getActiveTeamId } from "@/lib/benchAuth";
 
 // Display labels keyed by model id
 const MODEL_LABELS: Record<string, string> = Object.fromEntries(
@@ -53,6 +57,7 @@ const RUN_TONE: Record<string, string> = {
 };
 
 export default function ModelSelector({ domain }: Props) {
+  const { ensureBenchForRun } = useBenchAuth();
   const [selected, setSelected] = useState<string[]>([]);
   const [numEpisodes, setNumEpisodes] = useState(1);
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
@@ -68,11 +73,14 @@ export default function ModelSelector({ domain }: Props) {
 
   const handleSubmit = async () => {
     if (selected.length === 0) return;
+    const access = await ensureBenchForRun();
+    if (access === "need_guest") return;
     setStatus("submitting");
     setError(null);
     setMonitorError(null);
     setRunViews({});
     try {
+      const teamId = getActiveTeamId();
       const runs = await Promise.all(
         selected.map((model) =>
           createRun({
@@ -80,6 +88,7 @@ export default function ModelSelector({ domain }: Props) {
             binding_vow_version: domain.binding_vow.version,
             agent_config: { model },
             num_episodes: numEpisodes,
+            ...(teamId ? { team_id: teamId } : {}),
           })
         )
       );
@@ -144,7 +153,9 @@ export default function ModelSelector({ domain }: Props) {
   const submitDisabled = selected.length === 0 || status === "submitting";
 
   return (
+    <BenchAccessGate>
     <div className="space-y-4">
+      <SubmittingAsBanner compact />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ModelColumn
           title="available"
@@ -309,6 +320,7 @@ export default function ModelSelector({ domain }: Props) {
         )}
       </div>
     </div>
+    </BenchAccessGate>
   );
 }
 

@@ -8,7 +8,9 @@ import {
   type ReactNode,
 } from "react";
 import { authRequest, getCSRF, resetCSRF } from "@/lib/authApi";
+import { benchGuestLogout, clearBenchAuth, syncMemberBenchAuth } from "@/lib/benchAuth";
 import { getCurrentUser } from "@/lib/member";
+import { benchAuthDisabled } from "@/lib/env";
 import type { Member } from "@/types/member";
 
 interface LoginErrorBody {
@@ -119,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(true);
         setError(undefined);
         await refreshUser();
+        if (!benchAuthDisabled()) await syncMemberBenchAuth();
       } else {
         handleLoginError(res.data as LoginErrorBody);
         throw new Error("Login failed");
@@ -132,6 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (res.status === 200) {
       resetCSRF();
       await getCSRF();
+      if (!benchAuthDisabled()) await benchGuestLogout();
+      else clearBenchAuth();
       setIsAuthenticated(false);
       setMember(undefined);
       setError(undefined);

@@ -121,7 +121,8 @@ export function AuthPage() {
         </h1>
         <p className="mt-3 text-sm text-ink-2 leading-relaxed">
           Same credentials as engagement.swecc.org. Required for the developer
-          registry.
+          registry, teams, and saved bench runs. Guests can still try demos from
+          exhibit pages without an account.
         </p>
       </header>
 

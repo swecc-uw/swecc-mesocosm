@@ -14,6 +14,7 @@ import { ShowcaseConnectionsPage } from "./pages/ShowcaseConnectionsPage";
 import { ShowcaseTradingPage } from "./pages/ShowcaseTradingPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { AuthPage } from "./pages/AuthPage";
+import { AccountPage } from "./pages/AccountPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 /** Vite `BASE_URL` ends with `/`; React Router `basename` must not. */
@@ -45,6 +46,15 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="account"
+          element={
+            <ProtectedRoute>
+              <AccountPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="teams" element={<Navigate to="/account#teams" replace />} />
         <Route path="domains/:id" element={<DomainDetailPage />} />
         <Route path="showcase" element={<ShowcasePage />} />
         <Route path="showcase/connections" element={<ShowcaseConnectionsPage />} />

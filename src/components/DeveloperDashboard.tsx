@@ -10,18 +10,18 @@ import {
   Episode,
   getBenchJobs,
   getDevBenchStatus,
-  getDomain,
   pollEnvStatus,
   retryEnvironment,
   startFullBench,
   submitDeveloperEnvironment,
   testBench,
-  unpublishDomain,
   SUPPORTED_MODELS,
 } from "@/lib/api";
 import { Btn } from "@/components/ds/Btn";
 import { FullBenchResult, TestBenchResult } from "@/components/BenchResultPanel";
-import { API_BASE } from "@/lib/env";
+import { getActiveTeamId } from "@/lib/benchAuth";
+import { SubmittingAsBanner } from "@/components/SubmittingAsBanner";
+import { SubmitViaApiPanel } from "@/components/SubmitViaApiPanel";
 
 const STATUS_TONE: Record<string, { label: string; tone: string }> = {
   pending:  { label: "pending",  tone: "text-ink-3" },
@@ -60,29 +60,50 @@ function UsagePill({ label, value }: { label: string; value: string | number | n
   );
 }
 
-// ── Model picker for test bench ────────────────────────────────────────────────
+// ── Test bench modal (one platform-wide slot; see bench-api /v1/bench/status) ───
 
-function TestBenchPanel({
+function TestBenchModal({
+  open,
   envId,
+  envName,
   devBenchBusy,
-  onResult,
+  onClose,
 }: {
+  open: boolean;
   envId: string;
+  envName: string;
   devBenchBusy: boolean;
-  onResult: (ep: Episode) => void;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [model, setModel] = useState(SUPPORTED_MODELS[0].id);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<Episode | null>(null);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !loading) onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, loading, onClose]);
 
   async function handleRun() {
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       const ep = await testBench({ env_id: envId, model, num_episodes: 1 });
-      onResult(ep);
-      setOpen(false);
+      setResult(ep);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bench failed");
     } finally {
@@ -90,46 +111,104 @@ function TestBenchPanel({
     }
   }
 
-  if (!open) {
-    return (
-      <Btn
-        variant="link"
-        onClick={() => setOpen(true)}
-        disabled={devBenchBusy}
-        className={devBenchBusy ? "opacity-40 cursor-not-allowed" : ""}
-        title={devBenchBusy ? "A test bench is already running" : undefined}
-      >
-        Test bench →
-      </Btn>
-    );
-  }
+  if (!open) return null;
 
   return (
-    <div className="mt-3 border border-line rounded-[2px] bg-paper-2 p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="eyebrow">pick a model</span>
-        <button onClick={() => setOpen(false)} className="text-ink-3 hover:text-ink text-lg leading-none">×</button>
-      </div>
-      <select
-        value={model}
-        onChange={(e) => setModel(e.target.value)}
-        className="w-full px-3 py-2 text-sm bg-paper border border-line rounded-[2px] focus:outline-none focus:border-ink"
-      >
-        {SUPPORTED_MODELS.map(({ id, label }) => (
-          <option key={id} value={id}>{label}</option>
-        ))}
-      </select>
-      {error && <p className="text-xs text-bad">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <Btn variant="link" onClick={() => setOpen(false)}>Cancel</Btn>
-        <Btn
-          variant="primary"
-          onClick={handleRun}
-          disabled={loading}
-          className={loading ? "opacity-40 cursor-not-allowed" : ""}
-        >
-          {loading ? "Running…" : "Run →"}
-        </Btn>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="test-bench-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
+        aria-label="Close"
+        onClick={() => !loading && onClose()}
+      />
+      <div className="relative w-full max-w-lg max-h-[min(90vh,640px)] overflow-y-auto border border-line rounded-[2px] bg-paper shadow-lg">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-paper px-6 py-4">
+          <div className="min-w-0">
+            <span className="eyebrow eyebrow-leaf">— test bench</span>
+            <h2
+              id="test-bench-title"
+              className="mt-2 text-xl font-medium text-ink [font-family:var(--f-display)] truncate"
+              style={{ letterSpacing: "-0.012em" }}
+            >
+              {envName}
+            </h2>
+            <p className="mt-1 text-xs text-ink-2 leading-relaxed">
+              One model, one episode. The dev test bench is shared across all users — only one run
+              at a time on the server.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="text-ink-3 hover:text-ink text-2xl leading-none shrink-0 disabled:opacity-40"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {devBenchBusy && !loading && !result && (
+            <p className="text-sm text-warn border border-line rounded-[2px] px-3 py-2 bg-paper-2">
+              Another test bench is running platform-wide. Try again in a moment.
+            </p>
+          )}
+
+          {!result ? (
+            <>
+              <label className="block">
+                <span className="eyebrow mb-1.5 block">Model</span>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={loading || devBenchBusy}
+                  className="w-full px-3 py-2 text-sm bg-paper-2 border border-line rounded-[2px] focus:outline-none focus:border-ink disabled:opacity-50"
+                >
+                  {SUPPORTED_MODELS.map(({ id, label }) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {error && (
+                <p className="text-sm text-bad border border-line rounded-[2px] px-3 py-2 bg-paper-2">
+                  {error}
+                </p>
+              )}
+            </>
+          ) : (
+            <TestBenchResult episode={result} />
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-paper px-6 py-4">
+          {result ? (
+            <Btn variant="primary" onClick={onClose}>
+              Done
+            </Btn>
+          ) : (
+            <>
+              <Btn variant="link" onClick={onClose} disabled={loading}>
+                Cancel
+              </Btn>
+              <Btn
+                variant="primary"
+                onClick={() => void handleRun()}
+                disabled={loading || devBenchBusy}
+                className={loading || devBenchBusy ? "opacity-40 cursor-not-allowed" : ""}
+              >
+                {loading ? "Running…" : "Run test →"}
+              </Btn>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -150,15 +229,13 @@ function EnvironmentCard({
   onEnvUpdate: (updated: DeveloperEnvironment) => void;
   onEnvDelete: (id: string) => void;
 }) {
-  const [testResult, setTestResult] = useState<Episode | null>(null);
+  const [testBenchOpen, setTestBenchOpen] = useState(false);
   const [fullBenchJob, setFullBenchJob] = useState<BenchJob | null>(null);
   const [fullBenchError, setFullBenchError] = useState<string | null>(null);
   const [confirmFull, setConfirmFull] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [unpublishing, setUnpublishing] = useState(false);
-  const [domainStatus, setDomainStatus] = useState<string | null>(null);
   const [errorExpanded, setErrorExpanded] = useState(false);
 
   const created = new Date(env.created_at).toLocaleDateString("en-US", {
@@ -167,28 +244,6 @@ function EnvironmentCard({
   const avgScore = usage?.avg_score != null ? usage.avg_score.toFixed(3) : null;
   const bestScore = usage?.best_score != null ? usage.best_score.toFixed(3) : null;
   const canRetry = env.status === "failed" || env.status === "pending";
-
-  useEffect(() => {
-    if (!env.domain_id) return;
-    let alive = true;
-    getDomain(env.domain_id)
-      .then((d) => { if (alive) setDomainStatus(d.status); })
-      .catch(() => { if (alive) setDomainStatus(null); });
-    return () => { alive = false; };
-  }, [env.domain_id]);
-
-  async function handleUnpublish() {
-    if (!env.domain_id) return;
-    setUnpublishing(true);
-    try {
-      const updated = await unpublishDomain(env.domain_id);
-      setDomainStatus(updated.status);
-    } catch {
-      // keep published state on failure
-    } finally {
-      setUnpublishing(false);
-    }
-  }
 
   async function handleRetry() {
     setRetrying(true);
@@ -314,29 +369,39 @@ function EnvironmentCard({
       {/* Action row */}
       <div className="mt-4 flex items-center gap-3 flex-wrap">
         {env.status === "ready" && env.domain_id && (
-          <>
-            <Link
-              to={`/domains/${env.domain_id}`}
-              className="text-xs text-ink-2 hover:text-leaf-deep transition-colors uppercase tracking-[0.14em]"
-            >
-              View domain →
-            </Link>
-            {domainStatus === "published" && (
-              <Btn
-                variant="link"
-                onClick={handleUnpublish}
-                disabled={unpublishing}
-                className={unpublishing ? "opacity-40 cursor-not-allowed text-bad" : "text-bad hover:text-bad/70"}
-              >
-                {unpublishing ? "Unpublishing…" : "Unpublish"}
-              </Btn>
-            )}
-          </>
+          <Link
+            to={`/domains/${env.domain_id}`}
+            className="text-xs text-ink-2 hover:text-leaf-deep transition-colors uppercase tracking-[0.14em]"
+          >
+            View domain →
+          </Link>
         )}
 
         {env.status === "ready" && (
           <>
-            <TestBenchPanel envId={env.id} devBenchBusy={devBenchBusy} onResult={setTestResult} />
+            <Btn
+              variant="link"
+              onClick={() => setTestBenchOpen(true)}
+              disabled={devBenchBusy}
+              className={devBenchBusy ? "opacity-40 cursor-not-allowed" : ""}
+              title={
+                devBenchBusy
+                  ? "Another user's test bench is using the shared slot"
+                  : undefined
+              }
+            >
+              Test bench →
+            </Btn>
+            {testBenchOpen ? (
+              <TestBenchModal
+                key={env.id}
+                open
+                envId={env.id}
+                envName={env.name}
+                devBenchBusy={devBenchBusy}
+                onClose={() => setTestBenchOpen(false)}
+              />
+            ) : null}
             {!confirmFull ? (
               <Btn variant="link" onClick={() => setConfirmFull(true)}>Full bench →</Btn>
             ) : (
@@ -389,7 +454,6 @@ function EnvironmentCard({
       </div>
 
       {fullBenchError && <p className="mt-2 text-xs text-bad">{fullBenchError}</p>}
-      {testResult && <TestBenchResult episode={testResult} />}
       {fullBenchJob && <FullBenchResult job={fullBenchJob} />}
 
       <p className="eyebrow mt-3">submitted · {created}</p>
@@ -400,10 +464,8 @@ function EnvironmentCard({
 // ── Submit form ────────────────────────────────────────────────────────────────
 
 function SubmitForm({
-  ownerHandle,
   onSubmit,
 }: {
-  ownerHandle: string;
   onSubmit: (env: DeveloperEnvironment) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -420,9 +482,10 @@ function SubmitForm({
     setLoading(true);
     setError(null);
     try {
+      const teamId = getActiveTeamId();
       const env = await submitDeveloperEnvironment({
         ...form,
-        owner_id: ownerHandle,
+        ...(teamId ? { team_id: teamId } : {}),
       });
       onSubmit(env);
       setOpen(false);
@@ -452,17 +515,8 @@ function SubmitForm({
         <button onClick={() => setOpen(false)} className="text-ink-3 hover:text-ink transition-colors text-xl leading-none" aria-label="Close">×</button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="eyebrow mb-1.5 block">your id / handle</label>
-            <input
-              readOnly
-              value={ownerHandle}
-              className="w-full px-3 py-2 text-sm bg-paper-2 border border-line rounded-[2px] text-ink-2 cursor-default"
-            />
-          </div>
-          <FormInput label="environment name" required value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="my coding bench" />
-        </div>
+        <SubmittingAsBanner compact />
+        <FormInput label="environment name" required value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="my coding bench" />
         <FormInput
           label="github repository url"
           required
@@ -512,46 +566,15 @@ function FormInput({ label, required, type = "text", value, onChange, placeholde
   );
 }
 
-function ApiSnippet() {
-  const [copied, setCopied] = useState(false);
-  const snippet = `curl -X POST ${API_BASE}/v1/developer/environments \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "owner_id": "your-handle",
-    "name": "My Environment",
-    "github_url": "https://github.com/your-org/your-env",
-    "description": "What this env evaluates"
-  }'`;
-  async function copy() {
-    await navigator.clipboard.writeText(snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-  return (
-    <div className="border border-line rounded-[2px] overflow-hidden bg-paper-2">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-line">
-        <span className="eyebrow">submit via api</span>
-        <button onClick={copy} className="text-xs text-ink-2 hover:text-ink transition-colors uppercase tracking-[0.16em]">
-          {copied ? "copied" : "copy"}
-        </button>
-      </div>
-      <pre className="px-4 py-4 text-xs text-ink overflow-x-auto leading-relaxed" style={{ fontFamily: "var(--f-mono)" }}>
-        {snippet}
-      </pre>
-    </div>
-  );
-}
-
 // ── Main dashboard ─────────────────────────────────────────────────────────────
 
 interface DeveloperDashboardProps {
   initialEnvs: DeveloperEnvironment[];
-  ownerHandle: string;
 }
 
-export default function DeveloperDashboard({ initialEnvs, ownerHandle }: DeveloperDashboardProps) {
+export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardProps) {
   const [envs, setEnvs] = useState<DeveloperEnvironment[]>(initialEnvs);
-  const [filterOwner, setFilterOwner] = useState("");
+  const [filterName, setFilterName] = useState("");
   const [devBenchBusy, setDevBenchBusy] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -627,8 +650,8 @@ export default function DeveloperDashboard({ initialEnvs, ownerHandle }: Develop
     return () => clearInterval(interval);
   }, []);
 
-  const displayed = filterOwner.trim()
-    ? envs.filter((e) => e.owner_id.toLowerCase().includes(filterOwner.trim().toLowerCase()))
+  const displayed = filterName.trim()
+    ? envs.filter((e) => e.name.toLowerCase().includes(filterName.trim().toLowerCase()))
     : envs;
 
   const total = envs.length;
@@ -647,10 +670,15 @@ export default function DeveloperDashboard({ initialEnvs, ownerHandle }: Develop
         </p>
       </header>
 
+      <div className="mb-6">
+        <SubmittingAsBanner />
+      </div>
+
       {devBenchBusy && (
-        <div className="mb-6 px-4 py-3 border border-line rounded-[2px] bg-paper-2 flex items-center gap-2 text-xs text-warn">
-          <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse" />
-          A test bench is currently running. Only one at a time is supported.
+        <div className="mb-6 px-4 py-3 border border-line rounded-[2px] bg-paper-2 flex items-center gap-2 text-xs text-warn leading-relaxed">
+          <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse shrink-0" />
+          A dev test bench is running somewhere on the platform (shared slot — not per-user).
+          New runs wait until it finishes.
         </div>
       )}
 
@@ -660,7 +688,7 @@ export default function DeveloperDashboard({ initialEnvs, ownerHandle }: Develop
         <StatPanel value={pendingCount} label="pending · processing" />
       </div>
 
-      <SubmitForm ownerHandle={ownerHandle} onSubmit={handleNewEnv} />
+      <SubmitForm onSubmit={handleNewEnv} />
 
       <div className="mb-10 grid grid-cols-2 gap-6">
         <div className="border border-line rounded-[2px] bg-paper-2 p-5">
@@ -676,33 +704,30 @@ export default function DeveloperDashboard({ initialEnvs, ownerHandle }: Develop
         </div>
         <div className="border border-line rounded-[2px] bg-paper-2 p-5">
           <h3 className="text-lg font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
-            Via the <em>SDK / API.</em>
+            Via <em>API / CLI.</em>
           </h3>
-          <p className="text-sm text-ink-2 mt-2 mb-4 leading-relaxed">
-            POST to the developer endpoint from CI/CD. Requires a <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at repo root.
+          <p className="text-sm text-ink-2 mt-2 leading-relaxed">
+            Use <code className="text-xs font-mono bg-paper px-1 rounded">curl</code> or the{" "}
+            <code className="text-xs font-mono bg-paper px-1 rounded">bench</code> CLI from CI or
+            your terminal. Requires <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at repo root.
           </p>
-          <a
-            href={`${API_BASE}/docs#/developer`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.16em] text-ink hover:text-leaf-deep transition-colors"
-          >
-            api docs <span aria-hidden>→</span>
-          </a>
         </div>
       </div>
 
-      <div className="mb-12"><ApiSnippet /></div>
+      <section className="mb-12 border border-line rounded-[2px] bg-paper p-6">
+        <h2 className="eyebrow mb-4">Submit via API or CLI</h2>
+        <SubmitViaApiPanel />
+      </section>
 
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-2xl font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
           Submitted <em>environments.</em>
         </h2>
         <input
-          value={filterOwner}
-          onChange={(e) => setFilterOwner(e.target.value)}
-          placeholder="filter by owner id…"
-          className="px-3 h-8 text-sm bg-paper border border-line rounded-full focus:outline-none focus:border-ink transition-colors w-52 placeholder:text-ink-3 num-tab"
+          value={filterName}
+          onChange={(e) => setFilterName(e.target.value)}
+          placeholder="filter by name…"
+          className="px-3 h-8 text-sm bg-paper border border-line rounded-full focus:outline-none focus:border-ink transition-colors w-52 placeholder:text-ink-3"
         />
       </div>
 
@@ -714,7 +739,7 @@ export default function DeveloperDashboard({ initialEnvs, ownerHandle }: Develop
           <p className="mt-2 text-sm text-ink-3 max-w-sm mx-auto">
             {envs.length === 0
               ? "Submit your first environment via the button above or the API."
-              : "Try a different owner-id filter."}
+              : "Try a different name filter."}
           </p>
         </div>
       ) : (

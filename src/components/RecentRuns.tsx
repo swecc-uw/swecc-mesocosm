@@ -1,13 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Episode, listRunEpisodes, listRuns, Run } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Episode,
+  listGalleryRuns,
+  listRunEpisodes,
+  listRuns,
+  Run,
+} from "@/lib/api";
+import type { GalleryRunEntry } from "@/types/bench";
+import { useBenchAuth } from "@/hooks/useBenchAuth";
+import { benchAuthDisabled } from "@/lib/env";
 
 interface Props {
   domainId: string;
 }
 
 type RunWithEpisodes = { run: Run; episodes: Episode[] };
+
+const POLL_MS = 5000;
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -35,19 +46,67 @@ const EP_DOT: Record<string, string> = {
   pending: "bg-ink-3",
 };
 
-export default function RecentRuns({ domainId }: Props) {
+/** Gallery list entries are a subset of Run — synthesize for unified recent-activity UI. */
+function runFromGalleryEntry(entry: GalleryRunEntry, bindingVersion: string): Run {
+  const scores: Record<string, number> = {};
+  if (entry.primary_score != null) {
+    scores.win_rate = entry.primary_score;
+  }
+  return {
+    id: entry.run_id,
+    config: {
+      domain_id: entry.domain_id,
+      binding_vow_version: bindingVersion,
+      agent_config: { model: entry.model },
+      num_episodes: 1,
+    },
+    requester_id: "gallery",
+    status: "completed",
+    created_at: entry.created_at,
+    scores,
+  };
+}
+
+export default function RecentRuns({
+  domainId,
+  bindingVowVersion = "1.0.0",
+}: Props & { bindingVowVersion?: string }) {
+  const { benchMe, refreshBench } = useBenchAuth();
   const [runs, setRuns] = useState<RunWithEpisodes[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const initialLoad = useRef(true);
 
   const fetchRuns = useCallback(async () => {
+    if (!initialLoad.current) setRefreshing(true);
     try {
-      const all = await listRuns(domainId);
-      const sorted = all.sort(
+      if (!benchAuthDisabled() && benchMe.type === "anonymous") {
+        await refreshBench();
+      }
+
+      const [apiRuns, gallery] = await Promise.all([
+        listRuns(domainId).catch(() => [] as Run[]),
+        listGalleryRuns(domainId, 30).catch(() => [] as GalleryRunEntry[]),
+      ]);
+
+      const byId = new Map<string, Run>();
+      for (const run of apiRuns) {
+        byId.set(run.id, run);
+      }
+      for (const entry of gallery) {
+        if (!byId.has(entry.run_id)) {
+          byId.set(entry.run_id, runFromGalleryEntry(entry, bindingVowVersion));
+        }
+      }
+
+      const sorted = [...byId.values()].sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
+
       const withEpisodes = await Promise.all(
         sorted.slice(0, 20).map(async (run) => {
           try {
@@ -60,17 +119,23 @@ export default function RecentRuns({ domainId }: Props) {
       );
       setRuns(withEpisodes);
       setError(null);
+      setLastRefresh(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load runs");
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      initialLoad.current = false;
     }
-  }, [domainId]);
+  }, [domainId, bindingVowVersion, benchMe.type, refreshBench]);
 
   useEffect(() => {
-    queueMicrotask(() => void fetchRuns());
-    const interval = setInterval(() => void fetchRuns(), 5000);
-    return () => clearInterval(interval);
+    const boot = window.setTimeout(() => void fetchRuns(), 0);
+    const interval = setInterval(() => void fetchRuns(), POLL_MS);
+    return () => {
+      window.clearTimeout(boot);
+      clearInterval(interval);
+    };
   }, [fetchRuns]);
 
   const toggle = (id: string) =>
@@ -80,6 +145,13 @@ export default function RecentRuns({ domainId }: Props) {
       else next.add(id);
       return next;
     });
+
+  const scopeHint =
+    benchMe.type === "member"
+      ? "Your runs on this domain plus public gallery entries."
+      : benchMe.type === "guest"
+        ? "Runs from your guest session and public gallery."
+        : "Public gallery runs only — sign in to see your private runs.";
 
   if (loading) {
     return (
@@ -100,12 +172,27 @@ export default function RecentRuns({ domainId }: Props) {
 
   return (
     <div className="border border-line rounded-[2px] bg-paper overflow-hidden">
-      <div className="px-4 py-2 bg-paper-2 border-b border-line flex items-center justify-between">
+      <div className="px-4 py-2 bg-paper-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
         <span className="eyebrow">recent runs</span>
-        <span className="eyebrow">
-          {runs.length} run{runs.length !== 1 ? "s" : ""}
-        </span>
+        <div className="flex items-center gap-3 text-xs text-ink-3">
+          <span className="flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${refreshing ? "bg-leaf-deep animate-pulse" : "bg-ok"}`}
+            />
+            {refreshing
+              ? "refreshing…"
+              : lastRefresh
+                ? `updated ${relativeTime(lastRefresh.toISOString())}`
+                : "live"}
+          </span>
+          <span className="eyebrow">
+            {runs.length} run{runs.length !== 1 ? "s" : ""}
+          </span>
+        </div>
       </div>
+      <p className="px-4 py-2 text-[11px] text-ink-3 border-b border-line bg-paper-2">
+        {scopeHint} Polls every {POLL_MS / 1000}s.
+      </p>
 
       {runs.length === 0 ? (
         <div className="px-4 py-10 text-center [font-family:var(--f-display)] italic text-ink-3 text-base">
@@ -125,6 +212,7 @@ export default function RecentRuns({ domainId }: Props) {
             return (
               <div key={run.id}>
                 <button
+                  type="button"
                   onClick={() => toggle(run.id)}
                   className="w-full text-left px-4 py-3 hover:bg-paper-2 transition-colors"
                 >

@@ -7,7 +7,7 @@
  * Override with `VITE_PUBLIC_API_BASE` (or alias `VITE_PUBLIC_API_URL`), or
  * the `ENV_FILE` GitHub Actions secret for Pages deploys.
  */
-const PRODUCTION_API_BASE = "https://api.swecc.org/bench";
+export const PRODUCTION_API_BASE = "https://api.swecc.org/bench";
 
 function readApiBase(): string {
   const fromEnv =
@@ -19,7 +19,7 @@ function readApiBase(): string {
 export const API_BASE = readApiBase();
 
 /** Django swecc-server (session auth). Same host as engagement — not under `/bench`. */
-const PRODUCTION_AUTH_API_BASE = "https://api.swecc.org";
+export const PRODUCTION_AUTH_API_BASE = "https://api.swecc.org";
 
 function readAuthApiBase(): string {
   const fromEnv = import.meta.env.VITE_AUTH_API_BASE;
@@ -29,3 +29,9 @@ function readAuthApiBase(): string {
 }
 
 export const AUTH_API_BASE = readAuthApiBase();
+
+/** When true, bench-api runs without member/guest auth (local swecc-core dev). */
+export function benchAuthDisabled(): boolean {
+  const v = import.meta.env.VITE_BENCH_AUTH_DISABLED;
+  return v === "1" || v === "true" || v === "yes";
+}

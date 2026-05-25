@@ -2,7 +2,20 @@
 // Hand-translated from src/core/*.py and src/api/routes/*.py.
 // Long-term: codegen from OpenAPI. For now, keep this honest.
 
-import { API_BASE } from "@/lib/env";
+import { API_BASE, benchAuthDisabled } from "@/lib/env";
+import {
+  getBenchAuthHeaders,
+  getBenchContextHeaders,
+} from "@/lib/benchAuth";
+import type {
+  BenchMe,
+  BenchMeContext,
+  BenchTeam,
+  BenchTeamDetail,
+  GalleryRunEntry,
+} from "@/types/bench";
+
+export { benchAuthDisabled };
 
 // ── Enums ──────────────────────────────────────────────────────────
 export type Tier = "tier1" | "tier2";
@@ -163,6 +176,7 @@ export interface RunConfig {
   seed_set?: number[];
   num_episodes: number;
   max_parallel?: number;
+  team_id?: string;
 }
 
 export interface Run {
@@ -256,17 +270,48 @@ export interface DeveloperEnvironmentWithUsage extends DeveloperEnvironment {
 }
 
 // ── Fetcher helpers ────────────────────────────────────────────────
-async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText} — ${path}`);
+async function parseError(res: Response, path: string): Promise<string> {
+  const text = await res.text();
+  try {
+    const body = JSON.parse(text) as { detail?: string | unknown };
+    if (typeof body.detail === "string") return body.detail;
+    if (body.detail) return JSON.stringify(body.detail);
+  } catch {
+    /* not json */
   }
+  return text || `${res.status} ${res.statusText} — ${path}`;
+}
+
+async function benchFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        ...getBenchAuthHeaders(),
+        ...getBenchContextHeaders(),
+        ...(init?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+  } catch (e) {
+    const hint =
+      e instanceof TypeError
+        ? `Cannot reach bench API at ${API_BASE}. Check docker compose (bench-api + nginx) and that you are signed in.`
+        : null;
+    throw new Error(hint ?? (e instanceof Error ? e.message : "Request failed"));
+  }
+  if (!res.ok) {
+    throw new Error(await parseError(res, path));
+  }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
+  return benchFetch<T>(path, init);
 }
 
 // ── Domain endpoints ───────────────────────────────────────────────
@@ -313,18 +358,22 @@ export async function listRunEpisodes(runId: string): Promise<Episode[]> {
 }
 
 // ── Developer ──────────────────────────────────────────────────────
-export async function listDeveloperEnvironments(
-  ownerId?: string,
-): Promise<DeveloperEnvironment[]> {
-  const q = ownerId ? `?owner_id=${encodeURIComponent(ownerId)}` : "";
+export async function listDeveloperEnvironments(opts?: {
+  scope?: "solo" | "team";
+  teamId?: string;
+}): Promise<DeveloperEnvironment[]> {
+  const params = new URLSearchParams();
+  if (opts?.scope) params.set("scope", opts.scope);
+  if (opts?.teamId) params.set("team_id", opts.teamId);
+  const q = params.toString() ? `?${params}` : "";
   return getJson<DeveloperEnvironment[]>(`/v1/developer/environments${q}`);
 }
 
 export async function submitDeveloperEnvironment(req: {
-  owner_id: string;
   name: string;
   description?: string;
   github_url: string;
+  team_id?: string;
 }): Promise<DeveloperEnvironment> {
   return getJson<DeveloperEnvironment>(`/v1/developer/environments`, {
     method: "POST",
@@ -346,14 +395,72 @@ export async function retryEnvironment(envId: string): Promise<DeveloperEnvironm
 }
 
 export async function deleteEnvironment(envId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/v1/developer/environments/${encodeURIComponent(envId)}`, {
-    method: "DELETE",
-    credentials: "include",
-    cache: "no-store",
+  await benchFetch<void>(
+    `/v1/developer/environments/${encodeURIComponent(envId)}`,
+    { method: "DELETE" },
+  );
+}
+
+// ── Me / gallery / teams (bench auth) ───────────────────────────────
+
+export async function fetchBenchMe(): Promise<BenchMe> {
+  return getJson<BenchMe>("/v1/me");
+}
+
+export async function fetchBenchMeContext(): Promise<BenchMeContext> {
+  return getJson<BenchMeContext>("/v1/me/context");
+}
+
+export async function listMyRuns(teamId?: string): Promise<Run[]> {
+  const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : "";
+  return getJson<Run[]>(`/v1/me/runs${q}`);
+}
+
+export async function listGalleryRuns(
+  domainId?: string,
+  limit = 50,
+): Promise<GalleryRunEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (domainId) params.set("domain_id", domainId);
+  return getJson<GalleryRunEntry[]>(`/v1/gallery/runs?${params}`);
+}
+
+export async function listTeams(): Promise<BenchTeam[]> {
+  return getJson<BenchTeam[]>("/v1/teams");
+}
+
+export async function createTeam(name: string, slug?: string): Promise<BenchTeam & { join_code: string }> {
+  return getJson("/v1/teams", {
+    method: "POST",
+    body: JSON.stringify({ name, slug: slug || undefined }),
   });
-  if (!res.ok && res.status !== 204) {
-    throw new Error(`${res.status} ${res.statusText}`);
-  }
+}
+
+export async function joinTeam(code: string): Promise<BenchTeam> {
+  return getJson("/v1/teams/join", {
+    method: "POST",
+    body: JSON.stringify({ code: code.toUpperCase() }),
+  });
+}
+
+export async function getTeam(teamId: string): Promise<BenchTeamDetail> {
+  return getJson<BenchTeamDetail>(`/v1/teams/${encodeURIComponent(teamId)}`);
+}
+
+export async function leaveTeam(teamId: string): Promise<void> {
+  await benchFetch(`/v1/teams/${encodeURIComponent(teamId)}/members/me`, {
+    method: "DELETE",
+  });
+}
+
+export async function regenerateTeamCode(teamId: string): Promise<{ join_code: string }> {
+  return getJson(`/v1/teams/${encodeURIComponent(teamId)}/join-code/regenerate`, {
+    method: "POST",
+  });
+}
+
+export async function deleteTeam(teamId: string): Promise<void> {
+  await benchFetch(`/v1/teams/${encodeURIComponent(teamId)}`, { method: "DELETE" });
 }
 
 export async function publishDomain(domainId: string): Promise<Domain> {

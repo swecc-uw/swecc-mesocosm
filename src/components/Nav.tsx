@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function Nav() {
   const pathname = useLocation().pathname;
-  const { isAuthenticated, isVerified, member, loading, logout } = useAuth();
+  const { isAuthenticated, isVerified, member, loading } = useAuth();
 
   const link = (href: string, label: string) => {
     const active =
@@ -53,6 +53,9 @@ export default function Nav() {
           {link("/", "Gallery")}
           {link("/showcase", "Showcase")}
           {link("/developer", "Developer")}
+          {!loading && isAuthenticated && isVerified && member
+            ? link("/account", member.username)
+            : null}
           <a
             href={`${API_BASE}/docs`}
             target="_blank"
@@ -61,18 +64,7 @@ export default function Nav() {
           >
             API Docs
           </a>
-          {!loading && isAuthenticated && isVerified && member ? (
-            <>
-              <span className="text-sm text-ink-2 hidden sm:inline">{member.username}</span>
-              <button
-                type="button"
-                onClick={() => void logout()}
-                className="text-sm text-ink-2 hover:text-ink transition-colors"
-              >
-                Sign out
-              </button>
-            </>
-          ) : !loading ? (
+          {!loading && !isAuthenticated ? (
             <Link
               to="/auth"
               className={`text-sm transition-colors ${

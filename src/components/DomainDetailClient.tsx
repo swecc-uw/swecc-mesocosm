@@ -11,6 +11,7 @@ import Leaderboard from "./Leaderboard";
 import ModelSelector from "./ModelSelector";
 import RecentRuns from "./RecentRuns";
 import VersionHistory from "./VersionHistory";
+import { BenchAccessGate } from "@/components/BenchAccessGate";
 
 interface Props {
   domain: Domain;
@@ -120,24 +121,26 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
                 {domain.status}
               </span>
             )}
-            {domain.status === "draft" && (
-              <button
-                onClick={handlePublish}
-                disabled={publishing || unpublishing}
-                className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-leaf-deep bg-leaf-tint text-leaf-deep hover:bg-leaf-deep hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {publishing ? "Publishing…" : "Publish →"}
-              </button>
-            )}
-            {domain.status === "published" && (
-              <button
-                onClick={handleUnpublish}
-                disabled={publishing || unpublishing}
-                className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-line text-ink-2 hover:border-bad hover:text-bad transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {unpublishing ? "Unpublishing…" : "Unpublish"}
-              </button>
-            )}
+            <BenchAccessGate membersOnly>
+              {domain.status === "draft" && (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing || unpublishing}
+                  className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-leaf-deep bg-leaf-tint text-leaf-deep hover:bg-leaf-deep hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {publishing ? "Publishing…" : "Publish →"}
+                </button>
+              )}
+              {domain.status === "published" && (
+                <button
+                  onClick={handleUnpublish}
+                  disabled={publishing || unpublishing}
+                  className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-line text-ink-2 hover:border-bad hover:text-bad transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {unpublishing ? "Unpublishing…" : "Unpublish"}
+                </button>
+              )}
+            </BenchAccessGate>
           </div>
           {publishError && (
             <p className="mt-2 text-xs text-bad">{publishError}</p>
@@ -207,7 +210,10 @@ function BenchPanel({
           </h2>
           <span className="text-xs text-ink-3">refreshes every 5s</span>
         </div>
-        <RecentRuns domainId={domain.id} />
+        <RecentRuns
+          domainId={domain.id}
+          bindingVowVersion={domain.binding_vow.version}
+        />
       </section>
 
       <section>
