@@ -43,6 +43,17 @@ export function TestBenchResult({ episode }: TestBenchResultProps) {
         <Metric label="steps" value={episode.steps} />
         <Metric label="status" value={episode.status} />
       </div>
+      {episode.status === "failed" && episode.terminal_info?.error != null && (
+        <div className="mt-3 border border-line rounded-[2px] bg-paper-2 px-3 py-2">
+          <p className="eyebrow text-bad mb-1">error</p>
+          <pre
+            className="text-xs text-bad whitespace-pre-wrap break-words num-tab leading-relaxed max-h-32 overflow-y-auto"
+            style={{ fontFamily: "var(--f-mono)" }}
+          >
+            {String(episode.terminal_info.error)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }
