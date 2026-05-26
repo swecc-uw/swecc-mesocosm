@@ -23,8 +23,6 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). Registered domains appear on the home page; click a card for detail.
 
-**Run replay** (public for gallery runs): `/runs/{run_id}` — step-by-step model reasoning export from `GET /v1/runs/{id}/export`. Environment authors use `bench run export` to build showcase UIs in their own repos (see swecc-core `services/bench/docs/SHOWCASE_DEVELOPER.md`).
-
 ### Environment
 
 Create `.env.local` (optional) — Vite only exposes variables prefixed with `VITE_`:

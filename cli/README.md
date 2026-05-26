@@ -20,5 +20,3 @@ bench run export RUN_ID -o showcase/data/replay.json
 ```
 
 See swecc-core `services/bench/docs/SHOWCASE_DEVELOPER.md` for building a showcase UI in **your repo** using `replay.json` (`reasoning`, observations, actions).
-
-Public replays on Mesocosm: `/runs/{run_id}` (gallery-public completed runs, no login).

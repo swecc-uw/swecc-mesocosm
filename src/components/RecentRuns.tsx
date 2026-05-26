@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   cancelRun,
   Episode,
@@ -299,15 +298,6 @@ export default function RecentRuns({
                             {cancellingIds.has(run.id) ? "Stopping…" : "Stop"}
                           </Btn>
                         )}
-                      {run.status === "completed" && (
-                        <Link
-                          to={`/runs/${run.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-[10px] uppercase tracking-[0.14em] text-leaf-deep hover:underline"
-                        >
-                          Replay
-                        </Link>
-                      )}
                       <span
                         className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] font-medium ${RUN_TONE[run.status] ?? "text-ink-3"}`}
                       >

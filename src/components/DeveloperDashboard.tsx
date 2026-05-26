@@ -658,14 +658,6 @@ function DeveloperRunsPanel({
                   Domain →
                 </Link>
               )}
-              {run.status === "completed" && (
-                <Link
-                  to={`/runs/${run.id}`}
-                  className="text-[10px] uppercase tracking-[0.14em] text-leaf-deep hover:underline"
-                >
-                  Replay
-                </Link>
-              )}
               <span className="text-[10px] uppercase tracking-[0.16em] text-ink-3">
                 {run.status}
               </span>
