@@ -7,6 +7,7 @@ import { useBenchAuth } from "@/hooks/useBenchAuth";
 import { useActiveTeam } from "@/hooks/useActiveTeam";
 import {
   createTeam,
+  deleteTeam,
   fetchBenchMeContext,
   getTeam,
   joinTeam,
@@ -32,6 +33,8 @@ export function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [createName, setCreateName] = useState("");
   const [joinCode, setJoinCode] = useState("");
+  const [confirmDeleteTeam, setConfirmDeleteTeam] = useState(false);
+  const [deletingTeam, setDeletingTeam] = useState(false);
 
   async function reloadAccount() {
     setLoading(true);
@@ -306,22 +309,32 @@ export function AccountPage() {
                   : "Switch to team"}
               </Btn>
               {selectedTeam.role === "owner" && (
-                <Btn
-                  variant="link"
-                  onClick={async () => {
-                    setTeamsBusy(true);
-                    try {
-                      const { join_code } = await regenerateTeamCode(selectedTeam.team_id);
-                      setSelectedTeam({ ...selectedTeam, join_code });
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "Regenerate failed");
-                    } finally {
-                      setTeamsBusy(false);
-                    }
-                  }}
-                >
-                  Regenerate code
-                </Btn>
+                <>
+                  <Btn
+                    variant="link"
+                    onClick={async () => {
+                      setTeamsBusy(true);
+                      try {
+                        const { join_code } = await regenerateTeamCode(selectedTeam.team_id);
+                        setSelectedTeam({ ...selectedTeam, join_code });
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Regenerate failed");
+                      } finally {
+                        setTeamsBusy(false);
+                      }
+                    }}
+                  >
+                    Regenerate code
+                  </Btn>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteTeam(true)}
+                    disabled={teamsBusy || deletingTeam}
+                    className="text-[10px] uppercase tracking-[0.14em] text-ink-3 hover:text-bad transition-colors disabled:opacity-40"
+                  >
+                    Delete team
+                  </button>
+                </>
               )}
               {selectedTeam.role !== "owner" && (
                 <Btn
@@ -344,6 +357,37 @@ export function AccountPage() {
               )}
             </div>
           </div>
+        )}
+
+        {confirmDeleteTeam && selectedTeam && selectedTeam.role === "owner" && (
+          <DeleteTeamModal
+            teamName={selectedTeam.name}
+            busy={deletingTeam}
+            onClose={() => !deletingTeam && setConfirmDeleteTeam(false)}
+            onConfirm={async () => {
+              setDeletingTeam(true);
+              setError(null);
+              try {
+                await deleteTeam(selectedTeam.team_id);
+                if (activeTeam?.id === selectedTeam.team_id) {
+                  selectTeam(null);
+                }
+                setSelectedTeam(null);
+                setConfirmDeleteTeam(false);
+                await reloadAccount();
+                await refreshBench();
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : "Delete failed";
+                setError(
+                  /403|forbidden|owner/i.test(msg)
+                    ? "Only the team owner can delete this team."
+                    : msg,
+                );
+              } finally {
+                setDeletingTeam(false);
+              }
+            }}
+          />
         )}
       </section>
 
@@ -396,6 +440,77 @@ function Stat({ label, value }: { label: string; value: number }) {
     <div className="border border-line rounded-[2px] p-5 bg-paper">
       <p className="num-old text-3xl text-ink">{value}</p>
       <p className="eyebrow mt-2">{label}</p>
+    </div>
+  );
+}
+
+function DeleteTeamModal({
+  teamName,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  teamName: string;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !busy) onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [busy, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-team-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
+        aria-label="Close"
+        onClick={() => !busy && onClose()}
+      />
+      <div className="relative w-full max-w-md border border-line rounded-[2px] bg-paper shadow-lg">
+        <div className="px-6 py-4 border-b border-line">
+          <span className="eyebrow">— delete team</span>
+          <h2
+            id="delete-team-title"
+            className="mt-2 text-xl font-medium text-ink [font-family:var(--f-display)]"
+            style={{ letterSpacing: "-0.012em" }}
+          >
+            Delete <em>{teamName}</em>?
+          </h2>
+          <p className="mt-2 text-sm text-ink-2 leading-relaxed">
+            This permanently removes the team and its join code. Members lose access; team runs and
+            environments stay in history but are no longer grouped under this team.
+          </p>
+        </div>
+        <div className="px-6 py-4 flex flex-wrap items-center justify-end gap-3 border-t border-line">
+          <Btn variant="link" type="button" onClick={onClose} disabled={busy}>
+            Cancel
+          </Btn>
+          <Btn
+            variant="primary"
+            type="button"
+            disabled={busy}
+            onClick={() => void onConfirm()}
+            className="!bg-bad !border-bad hover:!opacity-90"
+          >
+            {busy ? "Deleting…" : "Delete team"}
+          </Btn>
+        </div>
+      </div>
     </div>
   );
 }
