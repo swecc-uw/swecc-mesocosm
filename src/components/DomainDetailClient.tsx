@@ -16,11 +16,16 @@ import { BenchAccessGate } from "@/components/BenchAccessGate";
 interface Props {
   domain: Domain;
   leaderboard: LeaderboardEntry[];
+  envId?: string;
 }
 
 const TIER_ROMAN: Record<string, string> = { tier1: "i.", tier2: "ii." };
 
-export default function DomainDetailClient({ domain: initialDomain, leaderboard }: Props) {
+export default function DomainDetailClient({
+  domain: initialDomain,
+  leaderboard,
+  envId,
+}: Props) {
   const [domain, setDomain] = useState<Domain>(initialDomain);
   const [mode, setMode] = useState<Mode>("bench");
   const [publishing, setPublishing] = useState(false);
@@ -169,7 +174,7 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
       </div>
 
       {mode === "bench" ? (
-        <BenchPanel domain={domain} leaderboard={leaderboard} />
+        <BenchPanel domain={domain} leaderboard={leaderboard} envId={envId} />
       ) : (
         <EnvPanel domain={domain} />
       )}
@@ -194,12 +199,20 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
 function BenchPanel({
   domain,
   leaderboard,
+  envId,
 }: {
   domain: Domain;
   leaderboard: LeaderboardEntry[];
+  envId?: string;
 }) {
   return (
     <div className="space-y-12">
+      {envId && (
+        <p className="text-sm text-ink-2 border border-line rounded-[2px] px-4 py-3 bg-paper-2">
+          Runs are scoped to developer environment{" "}
+          <span className="num-tab text-ink">{envId.slice(0, 8)}…</span>.
+        </p>
+      )}
       <section>
         <div className="flex items-baseline justify-between mb-4">
           <h2
@@ -213,6 +226,7 @@ function BenchPanel({
         <RecentRuns
           domainId={domain.id}
           bindingVowVersion={domain.binding_vow.version}
+          envId={envId}
         />
       </section>
 
@@ -248,7 +262,7 @@ function BenchPanel({
         <p className="text-sm text-ink-2 mt-1 mb-5">
           Choose which models to evaluate against this domain.
         </p>
-        <ModelSelector domain={domain} />
+        <ModelSelector domain={domain} envId={envId} />
       </section>
     </div>
   );

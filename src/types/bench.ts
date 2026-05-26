@@ -17,7 +17,8 @@ export interface BenchMeContext {
     member_count: number;
     max_members: number;
     join_code?: string | null;
-    env_count?: number;
+    env_count: number;
+    run_count: number;
   }>;
 }
 

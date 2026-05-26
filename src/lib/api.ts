@@ -14,14 +14,29 @@ import type {
   BenchTeamDetail,
   GalleryRunEntry,
 } from "@/types/bench";
+import type { RunExport } from "@/types/runExport";
 
 export { benchAuthDisabled };
 
 // ── Enums ──────────────────────────────────────────────────────────
 export type Tier = "tier1" | "tier2";
 export type DomainStatus = "draft" | "testing" | "published" | "archived";
-export type RunStatus = "pending" | "running" | "completed" | "failed";
-export type EpStatus = "pending" | "running" | "completed" | "failed" | "timeout";
+export type RunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type EpStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "timeout"
+  | "cancelled";
+
+export function isActiveRunStatus(status: RunStatus | string): boolean {
+  return status === "pending" || status === "running";
+}
+
+export function isTerminalRunStatus(status: RunStatus | string): boolean {
+  return status === "completed" || status === "failed" || status === "cancelled";
+}
 export type EndpointMode = "remote" | "sandbox";
 export type SpaceType =
   | "discrete"
@@ -177,6 +192,7 @@ export interface RunConfig {
   num_episodes: number;
   max_parallel?: number;
   team_id?: string;
+  env_id?: string;
 }
 
 export interface Run {
@@ -187,6 +203,8 @@ export interface Run {
   created_at: string;
   completed_at?: string;
   scores: Record<string, number>;
+  team_id?: string | null;
+  env_id?: string | null;
 }
 
 export interface Episode {
@@ -213,6 +231,8 @@ export interface DeveloperEnvironment {
   env_url: string | null;
   error_message: string | null;
   created_at: string;
+  scope?: "solo" | "team";
+  team_id?: string | null;
 }
 
 // ── Bench ──────────────────────────────────────────────────────────
@@ -344,9 +364,21 @@ export async function createRun(config: RunConfig): Promise<Run> {
   });
 }
 
-export async function listRuns(domainId?: string): Promise<Run[]> {
-  const q = domainId ? `?domain_id=${encodeURIComponent(domainId)}` : "";
+export async function listRuns(opts?: {
+  domainId?: string;
+  envId?: string;
+}): Promise<Run[]> {
+  const params = new URLSearchParams();
+  if (opts?.domainId) params.set("domain_id", opts.domainId);
+  if (opts?.envId) params.set("env_id", opts.envId);
+  const q = params.toString() ? `?${params}` : "";
   return getJson<Run[]>(`/v1/runs${q}`);
+}
+
+export async function listEnvironmentRuns(envId: string, limit = 50): Promise<Run[]> {
+  return getJson<Run[]>(
+    `/v1/developer/environments/${encodeURIComponent(envId)}/runs?limit=${limit}`,
+  );
 }
 
 export async function getRun(runId: string): Promise<Run> {
@@ -355,6 +387,12 @@ export async function getRun(runId: string): Promise<Run> {
 
 export async function listRunEpisodes(runId: string): Promise<Episode[]> {
   return getJson<Episode[]>(`/v1/runs/${encodeURIComponent(runId)}/episodes`);
+}
+
+export async function cancelRun(runId: string): Promise<Run> {
+  return getJson<Run>(`/v1/runs/${encodeURIComponent(runId)}/cancel`, {
+    method: "POST",
+  });
 }
 
 // ── Developer ──────────────────────────────────────────────────────
@@ -387,6 +425,12 @@ export async function pollEnvStatus(envId: string): Promise<EnvPollResult> {
   );
 }
 
+export async function fetchEnvironmentUsage(envId: string): Promise<DomainUsageStats> {
+  return getJson<DomainUsageStats>(
+    `/v1/developer/environments/${encodeURIComponent(envId)}/usage`,
+  );
+}
+
 export async function retryEnvironment(envId: string): Promise<DeveloperEnvironment> {
   return getJson<DeveloperEnvironment>(
     `/v1/developer/environments/${encodeURIComponent(envId)}/retry`,
@@ -414,6 +458,11 @@ export async function fetchBenchMeContext(): Promise<BenchMeContext> {
 export async function listMyRuns(teamId?: string): Promise<Run[]> {
   const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : "";
   return getJson<Run[]>(`/v1/me/runs${q}`);
+}
+
+/** Full run bundle for showcase replay (public when gallery_public + completed). */
+export async function fetchRunExport(runId: string): Promise<RunExport> {
+  return getJson<RunExport>(`/v1/runs/${encodeURIComponent(runId)}/export`);
 }
 
 export async function listGalleryRuns(

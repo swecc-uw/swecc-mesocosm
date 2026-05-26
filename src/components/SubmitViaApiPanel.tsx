@@ -44,6 +44,9 @@ function cliSnippet(): string {
   return `# One-time install (PyPI)
 ${CLI_INSTALL}
 
+# Scaffold a new env repo (benchanything.json, adapter.py, env.py, showcase/)
+bench init
+
 # Defaults: api.swecc.org + /bench (override with SWECC_SERVER_URL / SWECC_BENCH_URL)
 bench auth login --username YOUR_USER --password YOUR_PASSWORD
 
@@ -51,6 +54,9 @@ bench env submit \\
   --name "FWT Tic Tac Toe" \\
   --github-url "https://github.com/FWT-bs/environments" \\
   --description "Tic-tac-toe env with benchanything.json at repo root"
+
+# After a completed run — export for your repo showcase UI:
+# bench run export RUN_ID -o showcase/data/replay.json
 
 # Optional: attribute env to your active team
 # bench team use TEAM_UUID

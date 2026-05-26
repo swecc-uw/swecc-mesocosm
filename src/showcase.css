@@ -699,3 +699,57 @@
   .sc-tr-portfolio, .sc-tr-news { position: relative; top: 0; max-height: none; }
   .sc-tr-recap-grid { grid-template-columns: 1fr; }
 }
+
+/* Tic tac toe — export replay (003) */
+.sc-ttt-root { margin-top: 8px; }
+.sc-ttt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-width: 280px;
+}
+.sc-ttt-cell {
+  aspect-ratio: 1;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: border-color 0.2s, background 0.2s;
+}
+.sc-ttt-cell.sc-ttt-highlight {
+  border-color: var(--leaf-deep);
+  background: var(--leaf-tint);
+}
+.sc-ttt-index {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 9px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sc-ttt-mark {
+  font-family: var(--f-display);
+  font-size: 2rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.sc-ttt-x .sc-ttt-mark { color: var(--leaf-deep); }
+.sc-ttt-o .sc-ttt-mark { color: var(--ink-2); }
+.sc-ttt-nav {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  transition: background 0.15s, color 0.15s;
+}
+.sc-ttt-nav:hover:not(:disabled) { background: var(--paper-2); }
+.sc-ttt-nav:disabled { opacity: 0.35; cursor: not-allowed; }

@@ -13,18 +13,26 @@ interface SubmittingAsBannerProps {
 export function SubmittingAsBanner({ compact = false }: SubmittingAsBannerProps) {
   const { team, clearTeam } = useActiveTeam();
 
-  if (benchAuthDisabled()) return null;
+  if (benchAuthDisabled() || compact) return null;
 
   if (!team) {
-    if (compact) return null;
     return (
-      <p className="text-xs text-ink-3 border border-line rounded-[2px] px-3 py-2 bg-paper-2">
-        Submitting as <strong className="text-ink">you (solo)</strong> — not on a team roster.{" "}
-        <Link to="/account#teams" className="text-leaf-deep underline underline-offset-2">
-          Join or create a team
-        </Link>{" "}
-        to credit work to a group.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border border-line rounded-[2px] px-3 py-2 bg-paper-2">
+        <p className="text-sm text-ink leading-relaxed">
+          <span className="eyebrow mr-2">submitting as</span>
+          <strong>you (solo)</strong>
+          <span className="text-ink-2">
+            {" "}
+            — runs and developer submissions are credited to you only.
+          </span>
+        </p>
+        <Link
+          to="/account#teams"
+          className="text-xs uppercase tracking-[0.14em] text-ink-2 hover:text-ink shrink-0"
+        >
+          Switch to team
+        </Link>
+      </div>
     );
   }
 

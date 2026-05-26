@@ -20,6 +20,15 @@ const DEMOS = [
     description:
       "An agent allocates capital across six tickers over a trading day, reading a streaming news feed.",
   },
+  {
+    slug: "tic-tac-toe",
+    number: "003",
+    title: "Tic tac toe",
+    subtitle: "from bench export",
+    contract: "json → cell index → binary",
+    description:
+      "Real team run JSON — model is X, the environment is O. Step through the board so opponent moves are visible.",
+  },
 ];
 
 export function ShowcasePage() {
@@ -38,8 +47,9 @@ export function ShowcasePage() {
           The <em>showcase.</em>
         </h1>
         <p className="mt-4 text-lg text-ink-2 leading-relaxed max-w-prose">
-          Two purpose-built demonstrations — each walks through the typed contract, the HTTP exchange, and a simulated episode step by step.
-          These are interactive guides, not live gallery entries.
+          Curated demonstrations — typed contract, HTTP exchange, and episode replay. The tic-tac-toe
+          entry is a <strong className="text-ink font-medium">live export</strong> from your bench run;
+          the others are scripted guides.
         </p>
       </header>
 

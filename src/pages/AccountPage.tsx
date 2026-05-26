@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Btn } from "@/components/ds/Btn";
 import { SubmittingAsBanner } from "@/components/SubmittingAsBanner";
+import { ScopePill } from "@/components/ScopePill";
 import { useAuth } from "@/hooks/useAuth";
 import { useBenchAuth } from "@/hooks/useBenchAuth";
 import { useActiveTeam } from "@/hooks/useActiveTeam";
@@ -114,6 +115,13 @@ export function AccountPage() {
       ? [member.firstName, member.lastName].filter(Boolean).join(" ")
       : member?.username;
 
+  const teamCtx =
+    ctx && activeTeam ? ctx.teams.find((t) => t.team_id === activeTeam.id) : null;
+  const envLabel = activeTeam ? `${activeTeam.name} environments` : "Solo environments";
+  const runLabel = activeTeam ? `${activeTeam.name} runs` : "Solo runs";
+  const envValue = activeTeam ? (teamCtx?.env_count ?? 0) : (ctx?.solo.env_count ?? 0);
+  const runValue = activeTeam ? (teamCtx?.run_count ?? 0) : (ctx?.solo.run_count ?? 0);
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-12 space-y-10">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -170,8 +178,8 @@ export function AccountPage() {
         <p className="text-sm text-ink-2">Loading…</p>
       ) : ctx ? (
         <section className="grid grid-cols-2 gap-4">
-          <Stat label="Solo environments" value={ctx.solo.env_count} />
-          <Stat label="Solo runs" value={ctx.solo.run_count} />
+          <Stat label={envLabel} value={envValue} />
+          <Stat label={runLabel} value={runValue} />
         </section>
       ) : null}
 
@@ -252,10 +260,11 @@ export function AccountPage() {
                       selectTeam({ id: t.team_id, name: t.name });
                     }
                     setLoading(true);
+                    void reloadAccount();
                     void refreshBench();
                   }}
                 >
-                  {activeTeam?.id === t.team_id ? "Submitting as team" : "Submit as team"}
+                  {activeTeam?.id === t.team_id ? "Switch to solo" : "Switch to team"}
                 </Btn>
               </li>
             ))}
@@ -275,8 +284,8 @@ export function AccountPage() {
             )}
             <p className="text-sm text-ink-2 leading-relaxed">
               {activeTeam?.id === selectedTeam.team_id
-                ? "New benchmark runs and developer submissions will be attributed to this team."
-                : "Select this team when you want the next submission or exhibit run to count for the team."}
+                ? "New benchmark runs and developer submissions are attributed to this team."
+                : "Switch to this team when you want the next submission or exhibit run on the team roster."}
             </p>
             <div className="flex flex-wrap gap-2">
               <Btn
@@ -287,11 +296,14 @@ export function AccountPage() {
                   } else {
                     selectTeam({ id: selectedTeam.team_id, name: selectedTeam.name });
                   }
+                  setLoading(true);
+                  void reloadAccount();
+                  void refreshBench();
                 }}
               >
                 {activeTeam?.id === selectedTeam.team_id
-                  ? "Submitting as this team"
-                  : "Submit as this team"}
+                  ? "Switch to solo"
+                  : "Switch to team"}
               </Btn>
               {selectedTeam.role === "owner" && (
                 <Btn
@@ -342,19 +354,31 @@ export function AccountPage() {
         {runs.length === 0 ? (
           <p className="text-sm text-ink-2 italic">No runs in this scope yet.</p>
         ) : (
-          <ul className="divide-y divide-line border border-line rounded-[2px]">
-            {runs.map((r) => (
-              <li key={r.id} className="px-4 py-3 text-sm num-tab">
-                <span className="text-ink">{r.config.domain_id}</span>
-                <span className="text-ink-3 mx-2">·</span>
-                <span className="text-ink-2">{r.config.agent_config.model}</span>
-                <span className="text-ink-3 mx-2">·</span>
-                <span className={r.status === "completed" ? "text-ok" : "text-ink-3"}>
-                  {r.status}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div
+            className={
+              runs.length > 5
+                ? "max-h-[17.5rem] overflow-y-auto overscroll-y-contain border border-line rounded-[2px]"
+                : "border border-line rounded-[2px]"
+            }
+          >
+            <ul className="divide-y divide-line">
+              {runs.map((r) => (
+                <li
+                  key={r.id}
+                  className="px-4 py-3 text-sm num-tab flex flex-wrap items-center gap-2"
+                >
+                  <ScopePill teamId={r.team_id} teamName={activeTeam?.name} />
+                  <span className="text-ink">{r.config.domain_id}</span>
+                  <span className="text-ink-3">·</span>
+                  <span className="text-ink-2">{r.config.agent_config.model}</span>
+                  <span className="text-ink-3">·</span>
+                  <span className={r.status === "completed" ? "text-ok" : "text-ink-3"}>
+                    {r.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
 

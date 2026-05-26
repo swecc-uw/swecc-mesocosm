@@ -1,15 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
+  cancelRun,
   Episode,
+  isActiveRunStatus,
   listGalleryRuns,
   listRunEpisodes,
   listRuns,
   Run,
 } from "@/lib/api";
+import { Btn } from "@/components/ds/Btn";
 import type { GalleryRunEntry } from "@/types/bench";
 import { useBenchAuth } from "@/hooks/useBenchAuth";
+import { useActiveTeam } from "@/hooks/useActiveTeam";
+import { ScopePill } from "@/components/ScopePill";
 import { benchAuthDisabled } from "@/lib/env";
 
 interface Props {
@@ -34,6 +40,7 @@ const RUN_TONE: Record<string, string> = {
   completed: "text-ok",
   failed: "text-bad",
   timeout: "text-bad",
+  cancelled: "text-warn",
   running: "text-leaf-deep",
   pending: "text-ink-3",
 };
@@ -42,6 +49,7 @@ const EP_DOT: Record<string, string> = {
   completed: "bg-ok",
   failed: "bg-bad",
   timeout: "bg-bad",
+  cancelled: "bg-warn",
   running: "bg-leaf-deep animate-pulse",
   pending: "bg-ink-3",
 };
@@ -69,16 +77,38 @@ function runFromGalleryEntry(entry: GalleryRunEntry, bindingVersion: string): Ru
 
 export default function RecentRuns({
   domainId,
+  envId,
   bindingVowVersion = "1.0.0",
-}: Props & { bindingVowVersion?: string }) {
+}: Props & { bindingVowVersion?: string; envId?: string }) {
   const { benchMe, refreshBench } = useBenchAuth();
+  const { team: activeTeam } = useActiveTeam();
   const [runs, setRuns] = useState<RunWithEpisodes[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const initialLoad = useRef(true);
+
+  const canManageRuns =
+    !benchAuthDisabled() && (benchMe.type === "member" || benchMe.type === "guest");
+
+  async function handleCancelRun(runId: string) {
+    setCancellingIds((prev) => new Set(prev).add(runId));
+    try {
+      await cancelRun(runId);
+      await fetchRuns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to cancel run");
+    } finally {
+      setCancellingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(runId);
+        return next;
+      });
+    }
+  }
 
   const fetchRuns = useCallback(async () => {
     if (!initialLoad.current) setRefreshing(true);
@@ -88,7 +118,7 @@ export default function RecentRuns({
       }
 
       const [apiRuns, gallery] = await Promise.all([
-        listRuns(domainId).catch(() => [] as Run[]),
+        listRuns({ domainId, envId }).catch(() => [] as Run[]),
         listGalleryRuns(domainId, 30).catch(() => [] as GalleryRunEntry[]),
       ]);
 
@@ -127,7 +157,7 @@ export default function RecentRuns({
       setRefreshing(false);
       initialLoad.current = false;
     }
-  }, [domainId, bindingVowVersion, benchMe.type, refreshBench]);
+  }, [domainId, envId, bindingVowVersion, benchMe.type, refreshBench]);
 
   useEffect(() => {
     const boot = window.setTimeout(() => void fetchRuns(), 0);
@@ -148,7 +178,9 @@ export default function RecentRuns({
 
   const scopeHint =
     benchMe.type === "member"
-      ? "Your runs on this domain plus public gallery entries."
+      ? activeTeam
+        ? `Your runs for ${activeTeam.name} on this domain, plus public gallery entries. Solo vs team is shown on each row.`
+        : "Your solo runs on this domain plus public gallery entries. Switch to a team on Account to bench as a group."
       : benchMe.type === "guest"
         ? "Runs from your guest session and public gallery."
         : "Public gallery runs only — sign in to see your private runs.";
@@ -199,7 +231,13 @@ export default function RecentRuns({
           no runs yet — submit one below or via the API.
         </div>
       ) : (
-        <div className="divide-y divide-line max-h-[480px] overflow-y-auto">
+        <div
+          className={
+            runs.length > 5
+              ? "divide-y divide-line max-h-[17.5rem] overflow-y-auto overscroll-y-contain"
+              : "divide-y divide-line"
+          }
+        >
           {runs.map(({ run, episodes }) => {
             const model = run.config.agent_config.model ?? "unknown";
             const isExpanded = expanded.has(run.id);
@@ -217,12 +255,24 @@ export default function RecentRuns({
                   className="w-full text-left px-4 py-3 hover:bg-paper-2 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
                       <span
                         className={`inline-block transition-transform text-ink-3 text-xs ${isExpanded ? "rotate-90" : ""}`}
                       >
                         ▸
                       </span>
+                      {run.requester_id !== "gallery" && (
+                        <ScopePill
+                          teamId={run.team_id}
+                          teamName={
+                            run.team_id && activeTeam?.id === run.team_id
+                              ? activeTeam.name
+                              : run.team_id
+                                ? "Team"
+                                : null
+                          }
+                        />
+                      )}
                       <span className="text-sm text-ink num-tab truncate">
                         {model}
                       </span>
@@ -234,6 +284,30 @@ export default function RecentRuns({
                       <span className="text-xs text-ink-2 num-tab">
                         {completedEps.length}/{episodes.length} ep
                       </span>
+                      {canManageRuns &&
+                        run.requester_id !== "gallery" &&
+                        isActiveRunStatus(run.status) && (
+                          <Btn
+                            variant="link"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleCancelRun(run.id);
+                            }}
+                            disabled={cancellingIds.has(run.id)}
+                            className="text-[10px] uppercase tracking-[0.14em] px-0 h-auto text-warn hover:text-bad"
+                          >
+                            {cancellingIds.has(run.id) ? "Stopping…" : "Stop"}
+                          </Btn>
+                        )}
+                      {run.status === "completed" && (
+                        <Link
+                          to={`/runs/${run.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[10px] uppercase tracking-[0.14em] text-leaf-deep hover:underline"
+                        >
+                          Replay
+                        </Link>
+                      )}
                       <span
                         className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] font-medium ${RUN_TONE[run.status] ?? "text-ink-3"}`}
                       >
