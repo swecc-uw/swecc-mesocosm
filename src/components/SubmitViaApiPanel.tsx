@@ -51,12 +51,9 @@ bench init
 bench auth login --username YOUR_USER --password YOUR_PASSWORD
 
 bench env submit \\
-  --name "FWT Tic Tac Toe" \\
-  --github-url "https://github.com/FWT-bs/environments" \\
-  --description "Tic-tac-toe env with benchanything.json at repo root"
-
-# After a completed run — export for your repo showcase UI:
-# bench run export RUN_ID -o showcase/data/replay.json
+  --name "My coding bench" \\
+  --github-url "https://github.com/your-org/your-env" \\
+  --description "Env with benchanything.json at repo root"
 
 # Optional: attribute env to your active team
 # bench team use TEAM_UUID
@@ -83,9 +80,9 @@ curl -X POST "$BENCH/v1/developer/environments" \\
   -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "name": "FWT Tic Tac Toe",
-    "github_url": "https://github.com/FWT-bs/environments",
-    "description": "Tic-tac-toe env with benchanything.json at repo root"
+    "name": "My coding bench",
+    "github_url": "https://github.com/your-org/your-env",
+    "description": "Env with benchanything.json at repo root"
   }'`;
 }
 

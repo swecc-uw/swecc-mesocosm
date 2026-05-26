@@ -14,8 +14,6 @@ import type {
   BenchTeamDetail,
   GalleryRunEntry,
 } from "@/types/bench";
-import type { RunExport } from "@/types/runExport";
-
 export { benchAuthDisabled };
 
 // ── Enums ──────────────────────────────────────────────────────────
@@ -458,11 +456,6 @@ export async function fetchBenchMeContext(): Promise<BenchMeContext> {
 export async function listMyRuns(teamId?: string): Promise<Run[]> {
   const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : "";
   return getJson<Run[]>(`/v1/me/runs${q}`);
-}
-
-/** Full run bundle for showcase replay (public when gallery_public + completed). */
-export async function fetchRunExport(runId: string): Promise<RunExport> {
-  return getJson<RunExport>(`/v1/runs/${encodeURIComponent(runId)}/export`);
 }
 
 export async function listGalleryRuns(
