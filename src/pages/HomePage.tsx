@@ -7,11 +7,15 @@ import {
   listDomains,
 } from "@/lib/api";
 import PracticalGallery from "@/components/PracticalGallery";
+import { listGalleryRuns } from "@/lib/api";
+import type { GalleryRunEntry } from "@/types/bench";
+import { benchAuthDisabled } from "@/lib/env";
 
 export function HomePage() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [leaderboards, setLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
   const [loading, setLoading] = useState(true);
+  const [guestRuns, setGuestRuns] = useState<GalleryRunEntry[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -42,9 +46,18 @@ export function HomePage() {
           }
         }),
       );
+      let galleryGuest: GalleryRunEntry[] = [];
+      if (!benchAuthDisabled()) {
+        try {
+          galleryGuest = await listGalleryRuns(undefined, 8);
+        } catch {
+          galleryGuest = [];
+        }
+      }
       if (!cancelled) {
         setDomains(nextDomains);
         setLeaderboards(lb);
+        setGuestRuns(galleryGuest);
         setLoading(false);
       }
     })();
@@ -71,6 +84,26 @@ export function HomePage() {
     <>
       <Hero exhibitsLive={exhibitsLive} />
       <ProcessStrip />
+
+      {guestRuns.length > 0 && (
+        <section className="max-w-7xl mx-auto px-6 py-10 border-b border-line">
+          <span className="eyebrow">— recent guest runs</span>
+          <p className="mt-2 text-sm text-ink-2 max-w-prose">
+            Public gallery entries from guest try sessions (not tied to an account).
+          </p>
+          <ul className="mt-4 divide-y divide-line border border-line rounded-[2px]">
+            {guestRuns.map((r) => (
+              <li key={r.run_id} className="px-4 py-2 text-sm flex justify-between gap-4">
+                <span className="text-ink num-tab">{r.domain_id}</span>
+                <span className="text-ink-2">{r.model}</span>
+                <span className="text-ink-3 num-tab">
+                  {r.primary_score != null ? r.primary_score.toFixed(3) : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section id="gallery" className="max-w-7xl mx-auto px-6 py-20">
         <header className="mb-10 flex items-end justify-between gap-6 border-b border-line pb-6">

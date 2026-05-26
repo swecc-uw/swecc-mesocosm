@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Domain, LeaderboardEntry, publishDomain } from "@/lib/api";
+import { Domain, LeaderboardEntry, publishDomain, unpublishDomain } from "@/lib/api";
 import { API_BASE } from "@/lib/env";
 import { Sigil } from "@/components/ds/Sigil";
 import TagBadge from "./TagBadge";
@@ -11,18 +11,25 @@ import Leaderboard from "./Leaderboard";
 import ModelSelector from "./ModelSelector";
 import RecentRuns from "./RecentRuns";
 import VersionHistory from "./VersionHistory";
+import { BenchAccessGate } from "@/components/BenchAccessGate";
 
 interface Props {
   domain: Domain;
   leaderboard: LeaderboardEntry[];
+  envId?: string;
 }
 
 const TIER_ROMAN: Record<string, string> = { tier1: "i.", tier2: "ii." };
 
-export default function DomainDetailClient({ domain: initialDomain, leaderboard }: Props) {
+export default function DomainDetailClient({
+  domain: initialDomain,
+  leaderboard,
+  envId,
+}: Props) {
   const [domain, setDomain] = useState<Domain>(initialDomain);
   const [mode, setMode] = useState<Mode>("bench");
   const [publishing, setPublishing] = useState(false);
+  const [unpublishing, setUnpublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
   async function handlePublish() {
@@ -35,6 +42,19 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
       setPublishError(e instanceof Error ? e.message : "Failed to publish");
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function handleUnpublish() {
+    setUnpublishing(true);
+    setPublishError(null);
+    try {
+      const updated = await unpublishDomain(domain.id);
+      setDomain(updated);
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : "Failed to unpublish");
+    } finally {
+      setUnpublishing(false);
     }
   }
 
@@ -106,15 +126,26 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
                 {domain.status}
               </span>
             )}
-            {domain.status === "draft" && (
-              <button
-                onClick={handlePublish}
-                disabled={publishing}
-                className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-leaf-deep bg-leaf-tint text-leaf-deep hover:bg-leaf-deep hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {publishing ? "Publishing…" : "Publish →"}
-              </button>
-            )}
+            <BenchAccessGate membersOnly>
+              {domain.status === "draft" && (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing || unpublishing}
+                  className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-leaf-deep bg-leaf-tint text-leaf-deep hover:bg-leaf-deep hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {publishing ? "Publishing…" : "Publish →"}
+                </button>
+              )}
+              {domain.status === "published" && (
+                <button
+                  onClick={handleUnpublish}
+                  disabled={publishing || unpublishing}
+                  className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-line text-ink-2 hover:border-bad hover:text-bad transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {unpublishing ? "Unpublishing…" : "Unpublish"}
+                </button>
+              )}
+            </BenchAccessGate>
           </div>
           {publishError && (
             <p className="mt-2 text-xs text-bad">{publishError}</p>
@@ -143,7 +174,7 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
       </div>
 
       {mode === "bench" ? (
-        <BenchPanel domain={domain} leaderboard={leaderboard} />
+        <BenchPanel domain={domain} leaderboard={leaderboard} envId={envId} />
       ) : (
         <EnvPanel domain={domain} />
       )}
@@ -168,12 +199,20 @@ export default function DomainDetailClient({ domain: initialDomain, leaderboard 
 function BenchPanel({
   domain,
   leaderboard,
+  envId,
 }: {
   domain: Domain;
   leaderboard: LeaderboardEntry[];
+  envId?: string;
 }) {
   return (
     <div className="space-y-12">
+      {envId && (
+        <p className="text-sm text-ink-2 border border-line rounded-[2px] px-4 py-3 bg-paper-2">
+          Runs are scoped to developer environment{" "}
+          <span className="num-tab text-ink">{envId.slice(0, 8)}…</span>.
+        </p>
+      )}
       <section>
         <div className="flex items-baseline justify-between mb-4">
           <h2
@@ -184,7 +223,11 @@ function BenchPanel({
           </h2>
           <span className="text-xs text-ink-3">refreshes every 5s</span>
         </div>
-        <RecentRuns domainId={domain.id} />
+        <RecentRuns
+          domainId={domain.id}
+          bindingVowVersion={domain.binding_vow.version}
+          envId={envId}
+        />
       </section>
 
       <section>
@@ -219,7 +262,7 @@ function BenchPanel({
         <p className="text-sm text-ink-2 mt-1 mb-5">
           Choose which models to evaluate against this domain.
         </p>
-        <ModelSelector domain={domain} />
+        <ModelSelector domain={domain} envId={envId} />
       </section>
     </div>
   );

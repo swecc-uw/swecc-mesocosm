@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   BenchJob,
   deleteEnvironment,
   DeveloperEnvironment,
+  fetchEnvironmentUsage,
+  listDeveloperEnvironments,
+  listEnvironmentRuns,
+  listMyRuns,
   DomainUsageStats,
   Episode,
   getBenchJobs,
   getDevBenchStatus,
   pollEnvStatus,
   retryEnvironment,
+  Run,
   startFullBench,
   submitDeveloperEnvironment,
   testBench,
@@ -19,7 +24,11 @@ import {
 } from "@/lib/api";
 import { Btn } from "@/components/ds/Btn";
 import { FullBenchResult, TestBenchResult } from "@/components/BenchResultPanel";
-import { API_BASE } from "@/lib/env";
+import { getActiveTeamId } from "@/lib/benchAuth";
+import { useActiveTeam } from "@/hooks/useActiveTeam";
+import { SubmittingAsBanner } from "@/components/SubmittingAsBanner";
+import { SubmitViaApiPanel } from "@/components/SubmitViaApiPanel";
+import { ScopePill } from "@/components/ScopePill";
 
 const STATUS_TONE: Record<string, { label: string; tone: string }> = {
   pending:  { label: "pending",  tone: "text-ink-3" },
@@ -58,29 +67,50 @@ function UsagePill({ label, value }: { label: string; value: string | number | n
   );
 }
 
-// ── Model picker for test bench ────────────────────────────────────────────────
+// ── Test bench modal (one platform-wide slot; see bench-api /v1/bench/status) ───
 
-function TestBenchPanel({
+function TestBenchModal({
+  open,
   envId,
+  envName,
   devBenchBusy,
-  onResult,
+  onClose,
 }: {
+  open: boolean;
   envId: string;
+  envName: string;
   devBenchBusy: boolean;
-  onResult: (ep: Episode) => void;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [model, setModel] = useState(SUPPORTED_MODELS[0].id);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<Episode | null>(null);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !loading) onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, loading, onClose]);
 
   async function handleRun() {
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       const ep = await testBench({ env_id: envId, model, num_episodes: 1 });
-      onResult(ep);
-      setOpen(false);
+      setResult(ep);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bench failed");
     } finally {
@@ -88,46 +118,104 @@ function TestBenchPanel({
     }
   }
 
-  if (!open) {
-    return (
-      <Btn
-        variant="link"
-        onClick={() => setOpen(true)}
-        disabled={devBenchBusy}
-        className={devBenchBusy ? "opacity-40 cursor-not-allowed" : ""}
-        title={devBenchBusy ? "A test bench is already running" : undefined}
-      >
-        Test bench →
-      </Btn>
-    );
-  }
+  if (!open) return null;
 
   return (
-    <div className="mt-3 border border-line rounded-[2px] bg-paper-2 p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="eyebrow">pick a model</span>
-        <button onClick={() => setOpen(false)} className="text-ink-3 hover:text-ink text-lg leading-none">×</button>
-      </div>
-      <select
-        value={model}
-        onChange={(e) => setModel(e.target.value)}
-        className="w-full px-3 py-2 text-sm bg-paper border border-line rounded-[2px] focus:outline-none focus:border-ink"
-      >
-        {SUPPORTED_MODELS.map(({ id, label }) => (
-          <option key={id} value={id}>{label}</option>
-        ))}
-      </select>
-      {error && <p className="text-xs text-bad">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <Btn variant="link" onClick={() => setOpen(false)}>Cancel</Btn>
-        <Btn
-          variant="primary"
-          onClick={handleRun}
-          disabled={loading}
-          className={loading ? "opacity-40 cursor-not-allowed" : ""}
-        >
-          {loading ? "Running…" : "Run →"}
-        </Btn>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="test-bench-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
+        aria-label="Close"
+        onClick={() => !loading && onClose()}
+      />
+      <div className="relative w-full max-w-lg max-h-[min(90vh,640px)] overflow-y-auto border border-line rounded-[2px] bg-paper shadow-lg">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-paper px-6 py-4">
+          <div className="min-w-0">
+            <span className="eyebrow eyebrow-leaf">— test bench</span>
+            <h2
+              id="test-bench-title"
+              className="mt-2 text-xl font-medium text-ink [font-family:var(--f-display)] truncate"
+              style={{ letterSpacing: "-0.012em" }}
+            >
+              {envName}
+            </h2>
+            <p className="mt-1 text-xs text-ink-2 leading-relaxed">
+              One model, one episode. The dev test bench is shared across all users — only one run
+              at a time on the server.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="text-ink-3 hover:text-ink text-2xl leading-none shrink-0 disabled:opacity-40"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {devBenchBusy && !loading && !result && (
+            <p className="text-sm text-warn border border-line rounded-[2px] px-3 py-2 bg-paper-2">
+              Another test bench is running platform-wide. Try again in a moment.
+            </p>
+          )}
+
+          {!result ? (
+            <>
+              <label className="block">
+                <span className="eyebrow mb-1.5 block">Model</span>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={loading || devBenchBusy}
+                  className="w-full px-3 py-2 text-sm bg-paper-2 border border-line rounded-[2px] focus:outline-none focus:border-ink disabled:opacity-50"
+                >
+                  {SUPPORTED_MODELS.map(({ id, label }) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {error && (
+                <p className="text-sm text-bad border border-line rounded-[2px] px-3 py-2 bg-paper-2">
+                  {error}
+                </p>
+              )}
+            </>
+          ) : (
+            <TestBenchResult episode={result} />
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-paper px-6 py-4">
+          {result ? (
+            <Btn variant="primary" onClick={onClose}>
+              Done
+            </Btn>
+          ) : (
+            <>
+              <Btn variant="link" onClick={onClose} disabled={loading}>
+                Cancel
+              </Btn>
+              <Btn
+                variant="primary"
+                onClick={() => void handleRun()}
+                disabled={loading || devBenchBusy}
+                className={loading || devBenchBusy ? "opacity-40 cursor-not-allowed" : ""}
+              >
+                {loading ? "Running…" : "Run test →"}
+              </Btn>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -137,18 +225,21 @@ function TestBenchPanel({
 
 function EnvironmentCard({
   env,
+  teamName,
   usage,
   devBenchBusy,
   onEnvUpdate,
   onEnvDelete,
 }: {
   env: DeveloperEnvironment;
+  teamName?: string | null;
   usage?: DomainUsageStats;
   devBenchBusy: boolean;
   onEnvUpdate: (updated: DeveloperEnvironment) => void;
   onEnvDelete: (id: string) => void;
 }) {
-  const [testResult, setTestResult] = useState<Episode | null>(null);
+  const [testBenchOpen, setTestBenchOpen] = useState(false);
+  const [envRuns, setEnvRuns] = useState<Run[]>([]);
   const [fullBenchJob, setFullBenchJob] = useState<BenchJob | null>(null);
   const [fullBenchError, setFullBenchError] = useState<string | null>(null);
   const [confirmFull, setConfirmFull] = useState(false);
@@ -199,6 +290,25 @@ function EnvironmentCard({
     }
   }
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (env.status !== "ready" || !env.domain_id) {
+        if (!cancelled) setEnvRuns([]);
+        return;
+      }
+      try {
+        const runs = await listEnvironmentRuns(env.id, 8);
+        if (!cancelled) setEnvRuns(runs);
+      } catch {
+        if (!cancelled) setEnvRuns([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [env.id, env.status, env.domain_id, fullBenchJob?.status, testBenchOpen]);
+
   // Poll full bench job until terminal
   useEffect(() => {
     if (!fullBenchJob || fullBenchJob.status === "completed" || fullBenchJob.status === "failed") return;
@@ -219,7 +329,10 @@ function EnvironmentCard({
     <article className="border border-line rounded-[2px] bg-paper p-5">
       {/* Header row */}
       <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <ScopePill teamId={env.team_id} teamName={teamName} />
+          </div>
           <h3 className="text-base font-medium text-ink truncate [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
             {env.name}
           </h3>
@@ -289,7 +402,7 @@ function EnvironmentCard({
       <div className="mt-4 flex items-center gap-3 flex-wrap">
         {env.status === "ready" && env.domain_id && (
           <Link
-            to={`/domains/${env.domain_id}`}
+            to={`/domains/${env.domain_id}?env_id=${encodeURIComponent(env.id)}`}
             className="text-xs text-ink-2 hover:text-leaf-deep transition-colors uppercase tracking-[0.14em]"
           >
             View domain →
@@ -298,7 +411,29 @@ function EnvironmentCard({
 
         {env.status === "ready" && (
           <>
-            <TestBenchPanel envId={env.id} devBenchBusy={devBenchBusy} onResult={setTestResult} />
+            <Btn
+              variant="link"
+              onClick={() => setTestBenchOpen(true)}
+              disabled={devBenchBusy}
+              className={devBenchBusy ? "opacity-40 cursor-not-allowed" : ""}
+              title={
+                devBenchBusy
+                  ? "Another user's test bench is using the shared slot"
+                  : undefined
+              }
+            >
+              Test bench →
+            </Btn>
+            {testBenchOpen ? (
+              <TestBenchModal
+                key={env.id}
+                open
+                envId={env.id}
+                envName={env.name}
+                devBenchBusy={devBenchBusy}
+                onClose={() => setTestBenchOpen(false)}
+              />
+            ) : null}
             {!confirmFull ? (
               <Btn variant="link" onClick={() => setConfirmFull(true)}>Full bench →</Btn>
             ) : (
@@ -351,8 +486,28 @@ function EnvironmentCard({
       </div>
 
       {fullBenchError && <p className="mt-2 text-xs text-bad">{fullBenchError}</p>}
-      {testResult && <TestBenchResult episode={testResult} />}
       {fullBenchJob && <FullBenchResult job={fullBenchJob} />}
+
+      {envRuns.length > 0 && (
+        <div className="mt-4 border border-line rounded-[2px] divide-y divide-line overflow-hidden">
+          <p className="px-3 py-2 eyebrow bg-paper-2">recent runs · this env</p>
+          <ul>
+            {envRuns.map((run) => (
+              <li
+                key={run.id}
+                className="px-3 py-2 flex items-center justify-between gap-2 text-xs"
+              >
+                <span className="text-ink num-tab truncate">
+                  {run.config.agent_config.model ?? "unknown"}
+                </span>
+                <span className="text-ink-3 uppercase tracking-[0.14em] shrink-0">
+                  {run.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <p className="eyebrow mt-3">submitted · {created}</p>
     </article>
@@ -361,21 +516,33 @@ function EnvironmentCard({
 
 // ── Submit form ────────────────────────────────────────────────────────────────
 
-function SubmitForm({ onSubmit }: { onSubmit: (env: DeveloperEnvironment) => void }) {
+function SubmitForm({
+  onSubmit,
+}: {
+  onSubmit: (env: DeveloperEnvironment) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ owner_id: "", name: "", description: "", github_url: "" });
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    github_url: "",
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      const env = await submitDeveloperEnvironment(form);
+      const teamId = getActiveTeamId();
+      const env = await submitDeveloperEnvironment({
+        ...form,
+        ...(teamId ? { team_id: teamId } : {}),
+      });
       onSubmit(env);
       setOpen(false);
-      setForm({ owner_id: "", name: "", description: "", github_url: "" });
+      setForm({ name: "", description: "", github_url: "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed");
     } finally {
@@ -401,10 +568,8 @@ function SubmitForm({ onSubmit }: { onSubmit: (env: DeveloperEnvironment) => voi
         <button onClick={() => setOpen(false)} className="text-ink-3 hover:text-ink transition-colors text-xl leading-none" aria-label="Close">×</button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <FormInput label="your id / handle" required value={form.owner_id} onChange={(v) => setForm((f) => ({ ...f, owner_id: v }))} placeholder="acme-corp" />
-          <FormInput label="environment name" required value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="my coding bench" />
-        </div>
+        <SubmittingAsBanner compact />
+        <FormInput label="environment name" required value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="my coding bench" />
         <FormInput
           label="github repository url"
           required
@@ -454,50 +619,151 @@ function FormInput({ label, required, type = "text", value, onChange, placeholde
   );
 }
 
-function ApiSnippet() {
-  const [copied, setCopied] = useState(false);
-  const snippet = `curl -X POST ${API_BASE}/v1/developer/environments \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "owner_id": "your-handle",
-    "name": "My Environment",
-    "github_url": "https://github.com/your-org/your-env",
-    "description": "What this env evaluates"
-  }'`;
-  async function copy() {
-    await navigator.clipboard.writeText(snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+// ── Team / API runs (not tied to a team dev env row) ───────────────────────────
+
+function DeveloperRunsPanel({
+  runs,
+  title,
+  hint,
+}: {
+  runs: Run[];
+  title: ReactNode;
+  hint: string;
+}) {
+  if (runs.length === 0) return null;
+
   return (
-    <div className="border border-line rounded-[2px] overflow-hidden bg-paper-2">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-line">
-        <span className="eyebrow">submit via api</span>
-        <button onClick={copy} className="text-xs text-ink-2 hover:text-ink transition-colors uppercase tracking-[0.16em]">
-          {copied ? "copied" : "copy"}
-        </button>
+    <section className="mb-10 border border-line rounded-[2px] bg-paper overflow-hidden">
+      <div className="px-5 py-4 border-b border-line bg-paper-2">
+        <h2 className="text-lg font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
+          {title}
+        </h2>
+        <p className="text-sm text-ink-2 mt-1 max-w-prose leading-relaxed">{hint}</p>
       </div>
-      <pre className="px-4 py-4 text-xs text-ink overflow-x-auto leading-relaxed" style={{ fontFamily: "var(--f-mono)" }}>
-        {snippet}
-      </pre>
-    </div>
+      <ul className="divide-y divide-line">
+        {runs.slice(0, 12).map((run) => (
+          <li key={run.id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm text-ink num-tab truncate">
+                {run.config.agent_config.model ?? "unknown"}
+              </p>
+              <p className="text-xs text-ink-3 num-tab mt-0.5 truncate">{run.id}</p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {run.config.domain_id && (
+                <Link
+                  to={`/domains/${run.config.domain_id}`}
+                  className="text-[10px] uppercase tracking-[0.14em] text-ink-2 hover:text-leaf-deep"
+                >
+                  Domain →
+                </Link>
+              )}
+              {run.status === "completed" && (
+                <Link
+                  to={`/runs/${run.id}`}
+                  className="text-[10px] uppercase tracking-[0.14em] text-leaf-deep hover:underline"
+                >
+                  Replay
+                </Link>
+              )}
+              <span className="text-[10px] uppercase tracking-[0.16em] text-ink-3">
+                {run.status}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
 // ── Main dashboard ─────────────────────────────────────────────────────────────
 
-interface DeveloperDashboardProps {
-  initialEnvs: DeveloperEnvironment[];
-}
-
-export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardProps) {
-  const [envs, setEnvs] = useState<DeveloperEnvironment[]>(initialEnvs);
-  const [filterOwner, setFilterOwner] = useState("");
+export default function DeveloperDashboard() {
+  const { team: activeTeam } = useActiveTeam();
+  const [envs, setEnvs] = useState<DeveloperEnvironment[]>([]);
+  const [envsLoading, setEnvsLoading] = useState(true);
+  const [usageByEnvId, setUsageByEnvId] = useState<Record<string, DomainUsageStats>>({});
+  const [scopedRuns, setScopedRuns] = useState<Run[]>([]);
+  const [filterName, setFilterName] = useState("");
   const [devBenchBusy, setDevBenchBusy] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const loadEnvs = useCallback(async () => {
+    setEnvsLoading(true);
+    try {
+      const list = await listDeveloperEnvironments(
+        activeTeam
+          ? { scope: "team", teamId: activeTeam.id }
+          : { scope: "solo" }
+      );
+      setEnvs(list);
+    } catch {
+      setEnvs([]);
+    } finally {
+      setEnvsLoading(false);
+    }
+  }, [activeTeam]);
+
+  useEffect(() => {
+    // Data fetch; loadEnvs updates loading state after await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mount/team refresh
+    void loadEnvs();
+  }, [loadEnvs]);
+
+  useEffect(() => {
+    const ready = envs.filter((e) => e.domain_id);
+    let cancelled = false;
+    (async () => {
+      if (ready.length === 0) {
+        if (!cancelled) setUsageByEnvId({});
+        return;
+      }
+      const entries = await Promise.all(
+        ready.map(async (env) => {
+          try {
+            const usage = await fetchEnvironmentUsage(env.id);
+            return [env.id, usage] as const;
+          } catch {
+            return [env.id, null] as const;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const map: Record<string, DomainUsageStats> = {};
+      for (const [id, usage] of entries) {
+        if (usage) map[id] = usage;
+      }
+      setUsageByEnvId(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [envs]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const runs = await listMyRuns(activeTeam?.id);
+        if (!cancelled) setScopedRuns(runs);
+      } catch {
+        if (!cancelled) setScopedRuns([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeam?.id]);
+
   function handleNewEnv(env: DeveloperEnvironment) {
-    setEnvs((prev) => [env, ...prev]);
+    const isTeamEnv = Boolean(env.team_id);
+    const viewingTeam = Boolean(activeTeam?.id);
+    if (viewingTeam === isTeamEnv && (!activeTeam || env.team_id === activeTeam.id)) {
+      setEnvs((prev) => [env, ...prev]);
+    } else {
+      void loadEnvs();
+    }
   }
 
   function handleEnvUpdate(updated: DeveloperEnvironment) {
@@ -568,13 +834,25 @@ export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardPr
     return () => clearInterval(interval);
   }, []);
 
-  const displayed = filterOwner.trim()
-    ? envs.filter((e) => e.owner_id.toLowerCase().includes(filterOwner.trim().toLowerCase()))
+  const displayed = filterName.trim()
+    ? envs.filter((e) => e.name.toLowerCase().includes(filterName.trim().toLowerCase()))
     : envs;
 
   const total = envs.length;
   const readyCount = envs.filter((e) => e.status === "ready").length;
   const pendingCount = envs.filter((e) => e.status === "pending" || e.status === "cloning").length;
+  const scopeLabel = activeTeam ? `${activeTeam.name} team` : "solo";
+  const envSectionTitle = activeTeam ? (
+    <>
+      Submitted <em>environments</em>
+      <span className="text-ink-2 font-normal text-lg ml-2">({activeTeam.name})</span>
+    </>
+  ) : (
+    <>
+      Submitted <em>environments</em>
+      <span className="text-ink-2 font-normal text-lg ml-2">(solo)</span>
+    </>
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
@@ -588,20 +866,49 @@ export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardPr
         </p>
       </header>
 
+      <div className="mb-6">
+        <SubmittingAsBanner />
+      </div>
+
       {devBenchBusy && (
-        <div className="mb-6 px-4 py-3 border border-line rounded-[2px] bg-paper-2 flex items-center gap-2 text-xs text-warn">
-          <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse" />
-          A test bench is currently running. Only one at a time is supported.
+        <div className="mb-6 px-4 py-3 border border-line rounded-[2px] bg-paper-2 flex items-center gap-2 text-xs text-warn leading-relaxed">
+          <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse shrink-0" />
+          A dev test bench is running somewhere on the platform (shared slot — not per-user).
+          New runs wait until it finishes.
         </div>
       )}
 
       <div className="grid grid-cols-3 gap-4 mb-10">
-        <StatPanel value={total} label="environments submitted" />
+        <StatPanel value={total} label={`${scopeLabel} environments`} />
         <StatPanel value={readyCount} label="ready to benchmark" />
         <StatPanel value={pendingCount} label="pending · processing" />
       </div>
 
       <SubmitForm onSubmit={handleNewEnv} />
+
+      {activeTeam && (
+        <DeveloperRunsPanel
+          runs={scopedRuns}
+          title={
+            <>
+              Team benchmark <em>runs</em>
+            </>
+          }
+          hint="Runs started with this team active (API, CLI, or domain submit) appear here. They are separate from the environment registry below — you only see submitted repos as cards when the team owns a developer environment."
+        />
+      )}
+
+      {!activeTeam && scopedRuns.length > 0 && (
+        <DeveloperRunsPanel
+          runs={scopedRuns.filter((r) => !r.team_id)}
+          title={
+            <>
+              Recent solo <em>runs</em>
+            </>
+          }
+          hint="Solo runs from API/CLI or the domain page. Team-attributed runs are on Account when a team is active."
+        />
+      )}
 
       <div className="mb-10 grid grid-cols-2 gap-6">
         <div className="border border-line rounded-[2px] bg-paper-2 p-5">
@@ -617,45 +924,55 @@ export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardPr
         </div>
         <div className="border border-line rounded-[2px] bg-paper-2 p-5">
           <h3 className="text-lg font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
-            Via the <em>SDK / API.</em>
+            Via <em>CLI.</em>
           </h3>
-          <p className="text-sm text-ink-2 mt-2 mb-4 leading-relaxed">
-            POST to the developer endpoint from CI/CD. Requires a <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at repo root.
+          <p className="text-sm text-ink-2 mt-2 leading-relaxed">
+            Install the <code className="text-xs font-mono bg-paper px-1 rounded">bench</code> CLI
+            with <code className="text-xs font-mono bg-paper px-1 rounded">pip install swecc-mesocosm</code>{" "}
+            for CI or your terminal — production URLs are built in. Requires{" "}
+            <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at
+            repo root.
           </p>
-          <a
-            href={`${API_BASE}/docs#/developer`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.16em] text-ink hover:text-leaf-deep transition-colors"
-          >
-            api docs <span aria-hidden>→</span>
-          </a>
         </div>
       </div>
 
-      <div className="mb-12"><ApiSnippet /></div>
+      <section className="mb-12 border border-line rounded-[2px] bg-paper p-6">
+        <h2 className="eyebrow mb-4">Submit via CLI</h2>
+        <SubmitViaApiPanel />
+      </section>
 
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-2xl font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
-          Submitted <em>environments.</em>
-        </h2>
+      <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
+            {envSectionTitle}
+          </h2>
+          <p className="text-sm text-ink-2 mt-1 max-w-prose">
+            {activeTeam
+              ? "Only environments submitted while this team is active. Switch to solo on Account to see personal submissions."
+              : "Only your solo submissions. Switch to a team on Account to submit or view team environments."}
+          </p>
+        </div>
         <input
-          value={filterOwner}
-          onChange={(e) => setFilterOwner(e.target.value)}
-          placeholder="filter by owner id…"
-          className="px-3 h-8 text-sm bg-paper border border-line rounded-full focus:outline-none focus:border-ink transition-colors w-52 placeholder:text-ink-3 num-tab"
+          value={filterName}
+          onChange={(e) => setFilterName(e.target.value)}
+          placeholder="filter by name…"
+          className="px-3 h-8 text-sm bg-paper border border-line rounded-full focus:outline-none focus:border-ink transition-colors w-52 placeholder:text-ink-3"
         />
       </div>
 
-      {displayed.length === 0 ? (
+      {envsLoading ? (
+        <p className="text-sm text-ink-2 py-12 text-center">Loading environments…</p>
+      ) : displayed.length === 0 ? (
         <div className="border border-line rounded-[2px] bg-paper-2 py-20 text-center">
           <p className="[font-family:var(--f-display)] italic text-2xl text-ink-2">
-            {envs.length === 0 ? "no environments yet." : "no environments match this filter."}
+            {envs.length === 0 ? `no ${scopeLabel} environments yet.` : "no environments match this filter."}
           </p>
           <p className="mt-2 text-sm text-ink-3 max-w-sm mx-auto">
             {envs.length === 0
-              ? "Submit your first environment via the button above or the API."
-              : "Try a different owner-id filter."}
+              ? activeTeam
+                ? "Submit with this team active (banner above) or use the CLI with bench team use."
+                : "Submit your first solo environment via the button above or the API."
+              : "Try a different name filter."}
           </p>
         </div>
       ) : (
@@ -664,6 +981,8 @@ export default function DeveloperDashboard({ initialEnvs }: DeveloperDashboardPr
             <EnvironmentCard
               key={env.id}
               env={env}
+              teamName={activeTeam?.name}
+              usage={env.domain_id ? usageByEnvId[env.id] : undefined}
               devBenchBusy={devBenchBusy}
               onEnvUpdate={handleEnvUpdate}
               onEnvDelete={handleEnvDelete}

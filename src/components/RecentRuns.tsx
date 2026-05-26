@@ -1,13 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Episode, listRunEpisodes, listRuns, Run } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  cancelRun,
+  Episode,
+  isActiveRunStatus,
+  listGalleryRuns,
+  listRunEpisodes,
+  listRuns,
+  Run,
+} from "@/lib/api";
+import { Btn } from "@/components/ds/Btn";
+import type { GalleryRunEntry } from "@/types/bench";
+import { useBenchAuth } from "@/hooks/useBenchAuth";
+import { useActiveTeam } from "@/hooks/useActiveTeam";
+import { ScopePill } from "@/components/ScopePill";
+import { benchAuthDisabled } from "@/lib/env";
 
 interface Props {
   domainId: string;
 }
 
 type RunWithEpisodes = { run: Run; episodes: Episode[] };
+
+const POLL_MS = 5000;
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -23,6 +40,7 @@ const RUN_TONE: Record<string, string> = {
   completed: "text-ok",
   failed: "text-bad",
   timeout: "text-bad",
+  cancelled: "text-warn",
   running: "text-leaf-deep",
   pending: "text-ink-3",
 };
@@ -31,23 +49,94 @@ const EP_DOT: Record<string, string> = {
   completed: "bg-ok",
   failed: "bg-bad",
   timeout: "bg-bad",
+  cancelled: "bg-warn",
   running: "bg-leaf-deep animate-pulse",
   pending: "bg-ink-3",
 };
 
-export default function RecentRuns({ domainId }: Props) {
+/** Gallery list entries are a subset of Run — synthesize for unified recent-activity UI. */
+function runFromGalleryEntry(entry: GalleryRunEntry, bindingVersion: string): Run {
+  const scores: Record<string, number> = {};
+  if (entry.primary_score != null) {
+    scores.win_rate = entry.primary_score;
+  }
+  return {
+    id: entry.run_id,
+    config: {
+      domain_id: entry.domain_id,
+      binding_vow_version: bindingVersion,
+      agent_config: { model: entry.model },
+      num_episodes: 1,
+    },
+    requester_id: "gallery",
+    status: "completed",
+    created_at: entry.created_at,
+    scores,
+  };
+}
+
+export default function RecentRuns({
+  domainId,
+  envId,
+  bindingVowVersion = "1.0.0",
+}: Props & { bindingVowVersion?: string; envId?: string }) {
+  const { benchMe, refreshBench } = useBenchAuth();
+  const { team: activeTeam } = useActiveTeam();
   const [runs, setRuns] = useState<RunWithEpisodes[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
+  const initialLoad = useRef(true);
+
+  const canManageRuns =
+    !benchAuthDisabled() && (benchMe.type === "member" || benchMe.type === "guest");
+
+  async function handleCancelRun(runId: string) {
+    setCancellingIds((prev) => new Set(prev).add(runId));
+    try {
+      await cancelRun(runId);
+      await fetchRuns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to cancel run");
+    } finally {
+      setCancellingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(runId);
+        return next;
+      });
+    }
+  }
 
   const fetchRuns = useCallback(async () => {
+    if (!initialLoad.current) setRefreshing(true);
     try {
-      const all = await listRuns(domainId);
-      const sorted = all.sort(
+      if (!benchAuthDisabled() && benchMe.type === "anonymous") {
+        await refreshBench();
+      }
+
+      const [apiRuns, gallery] = await Promise.all([
+        listRuns({ domainId, envId }).catch(() => [] as Run[]),
+        listGalleryRuns(domainId, 30).catch(() => [] as GalleryRunEntry[]),
+      ]);
+
+      const byId = new Map<string, Run>();
+      for (const run of apiRuns) {
+        byId.set(run.id, run);
+      }
+      for (const entry of gallery) {
+        if (!byId.has(entry.run_id)) {
+          byId.set(entry.run_id, runFromGalleryEntry(entry, bindingVowVersion));
+        }
+      }
+
+      const sorted = [...byId.values()].sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
+
       const withEpisodes = await Promise.all(
         sorted.slice(0, 20).map(async (run) => {
           try {
@@ -60,17 +149,23 @@ export default function RecentRuns({ domainId }: Props) {
       );
       setRuns(withEpisodes);
       setError(null);
+      setLastRefresh(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load runs");
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      initialLoad.current = false;
     }
-  }, [domainId]);
+  }, [domainId, envId, bindingVowVersion, benchMe.type, refreshBench]);
 
   useEffect(() => {
-    queueMicrotask(() => void fetchRuns());
-    const interval = setInterval(() => void fetchRuns(), 5000);
-    return () => clearInterval(interval);
+    const boot = window.setTimeout(() => void fetchRuns(), 0);
+    const interval = setInterval(() => void fetchRuns(), POLL_MS);
+    return () => {
+      window.clearTimeout(boot);
+      clearInterval(interval);
+    };
   }, [fetchRuns]);
 
   const toggle = (id: string) =>
@@ -80,6 +175,15 @@ export default function RecentRuns({ domainId }: Props) {
       else next.add(id);
       return next;
     });
+
+  const scopeHint =
+    benchMe.type === "member"
+      ? activeTeam
+        ? `Your runs for ${activeTeam.name} on this domain, plus public gallery entries. Solo vs team is shown on each row.`
+        : "Your solo runs on this domain plus public gallery entries. Switch to a team on Account to bench as a group."
+      : benchMe.type === "guest"
+        ? "Runs from your guest session and public gallery."
+        : "Public gallery runs only — sign in to see your private runs.";
 
   if (loading) {
     return (
@@ -100,19 +204,40 @@ export default function RecentRuns({ domainId }: Props) {
 
   return (
     <div className="border border-line rounded-[2px] bg-paper overflow-hidden">
-      <div className="px-4 py-2 bg-paper-2 border-b border-line flex items-center justify-between">
+      <div className="px-4 py-2 bg-paper-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
         <span className="eyebrow">recent runs</span>
-        <span className="eyebrow">
-          {runs.length} run{runs.length !== 1 ? "s" : ""}
-        </span>
+        <div className="flex items-center gap-3 text-xs text-ink-3">
+          <span className="flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${refreshing ? "bg-leaf-deep animate-pulse" : "bg-ok"}`}
+            />
+            {refreshing
+              ? "refreshing…"
+              : lastRefresh
+                ? `updated ${relativeTime(lastRefresh.toISOString())}`
+                : "live"}
+          </span>
+          <span className="eyebrow">
+            {runs.length} run{runs.length !== 1 ? "s" : ""}
+          </span>
+        </div>
       </div>
+      <p className="px-4 py-2 text-[11px] text-ink-3 border-b border-line bg-paper-2">
+        {scopeHint} Polls every {POLL_MS / 1000}s.
+      </p>
 
       {runs.length === 0 ? (
         <div className="px-4 py-10 text-center [font-family:var(--f-display)] italic text-ink-3 text-base">
           no runs yet — submit one below or via the API.
         </div>
       ) : (
-        <div className="divide-y divide-line max-h-[480px] overflow-y-auto">
+        <div
+          className={
+            runs.length > 5
+              ? "divide-y divide-line max-h-[17.5rem] overflow-y-auto overscroll-y-contain"
+              : "divide-y divide-line"
+          }
+        >
           {runs.map(({ run, episodes }) => {
             const model = run.config.agent_config.model ?? "unknown";
             const isExpanded = expanded.has(run.id);
@@ -125,16 +250,29 @@ export default function RecentRuns({ domainId }: Props) {
             return (
               <div key={run.id}>
                 <button
+                  type="button"
                   onClick={() => toggle(run.id)}
                   className="w-full text-left px-4 py-3 hover:bg-paper-2 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
                       <span
                         className={`inline-block transition-transform text-ink-3 text-xs ${isExpanded ? "rotate-90" : ""}`}
                       >
                         ▸
                       </span>
+                      {run.requester_id !== "gallery" && (
+                        <ScopePill
+                          teamId={run.team_id}
+                          teamName={
+                            run.team_id && activeTeam?.id === run.team_id
+                              ? activeTeam.name
+                              : run.team_id
+                                ? "Team"
+                                : null
+                          }
+                        />
+                      )}
                       <span className="text-sm text-ink num-tab truncate">
                         {model}
                       </span>
@@ -146,6 +284,30 @@ export default function RecentRuns({ domainId }: Props) {
                       <span className="text-xs text-ink-2 num-tab">
                         {completedEps.length}/{episodes.length} ep
                       </span>
+                      {canManageRuns &&
+                        run.requester_id !== "gallery" &&
+                        isActiveRunStatus(run.status) && (
+                          <Btn
+                            variant="link"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleCancelRun(run.id);
+                            }}
+                            disabled={cancellingIds.has(run.id)}
+                            className="text-[10px] uppercase tracking-[0.14em] px-0 h-auto text-warn hover:text-bad"
+                          >
+                            {cancellingIds.has(run.id) ? "Stopping…" : "Stop"}
+                          </Btn>
+                        )}
+                      {run.status === "completed" && (
+                        <Link
+                          to={`/runs/${run.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[10px] uppercase tracking-[0.14em] text-leaf-deep hover:underline"
+                        >
+                          Replay
+                        </Link>
+                      )}
                       <span
                         className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] font-medium ${RUN_TONE[run.status] ?? "text-ink-3"}`}
                       >

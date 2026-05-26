@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import DomainDetailClient from "@/components/DomainDetailClient";
 import { getDomain, getLeaderboard, type Domain, type LeaderboardEntry } from "@/lib/api";
 
 export function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const envId = searchParams.get("env_id") ?? undefined;
   const [data, setData] = useState<{ domain: Domain; leaderboard: LeaderboardEntry[] } | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -45,5 +47,11 @@ export function DomainDetailPage() {
     );
   }
 
-  return <DomainDetailClient domain={data.domain} leaderboard={data.leaderboard} />;
+  return (
+    <DomainDetailClient
+      domain={data.domain}
+      leaderboard={data.leaderboard}
+      envId={envId}
+    />
+  );
 }

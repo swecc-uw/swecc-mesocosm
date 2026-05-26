@@ -1,13 +1,21 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { AuthProvider } from "@/hooks/useAuth";
+import { BenchAuthProvider } from "@/hooks/useBenchAuth";
 
 const el = document.getElementById("root");
 if (!el) {
   throw new Error("#root missing");
 }
 
-const app = <App />;
+const app = (
+  <AuthProvider>
+    <BenchAuthProvider>
+      <App />
+    </BenchAuthProvider>
+  </AuthProvider>
+);
 const wrapped = import.meta.env.DEV ? <StrictMode>{app}</StrictMode> : app;
 
 try {
