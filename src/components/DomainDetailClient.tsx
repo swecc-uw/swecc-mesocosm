@@ -59,7 +59,7 @@ export default function DomainDetailClient({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
+    <div className="max-w-6xl mx-auto min-w-0 px-4 sm:px-6 py-10 sm:py-12">
       {/* Breadcrumb */}
       <nav className="mb-8">
         <Link

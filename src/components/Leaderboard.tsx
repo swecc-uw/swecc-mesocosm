@@ -39,11 +39,15 @@ export default function Leaderboard({
   const scrollRuns = sorted.length > 5;
 
   return (
-    <div className="border border-line rounded-[2px] overflow-hidden bg-paper">
+    <div className="border border-line rounded-[2px] overflow-hidden bg-paper max-w-full">
       <div
-        className={scrollRuns ? "max-h-[17.5rem] overflow-y-auto overscroll-y-contain" : undefined}
+        className={
+          scrollRuns
+            ? "max-h-[17.5rem] overflow-y-auto overscroll-y-contain overflow-x-auto"
+            : "overflow-x-auto"
+        }
       >
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[28rem] text-sm">
         <thead className={scrollRuns ? "sticky top-0 z-10" : undefined}>
           <tr className="bg-paper-2 border-b border-line">
             <th className="text-left px-5 py-2.5 eyebrow w-12">rank</th>

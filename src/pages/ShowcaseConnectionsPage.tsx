@@ -29,7 +29,7 @@ export function ShowcaseConnectionsPage() {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12">
+    <div className="max-w-3xl mx-auto min-w-0 px-4 sm:px-6 py-10 sm:py-12">
       <nav className="mb-8">
         <Link
           to="/showcase"
@@ -146,7 +146,7 @@ function ExecutionTrace() {
       {steps.map((s, i) => (
         <li
           key={s.n}
-          className={`grid grid-cols-[48px_120px_1fr] items-baseline gap-4 px-4 py-3 ${i < steps.length - 1 ? "border-b border-line" : ""}`}
+          className={`grid grid-cols-1 gap-1 px-4 py-3 min-w-0 md:grid-cols-[48px_120px_1fr] md:items-baseline md:gap-4 ${i < steps.length - 1 ? "border-b border-line" : ""}`}
         >
           <span className="num-old text-lg text-leaf-deep">{s.n}</span>
           <span className="eyebrow">{s.label}</span>

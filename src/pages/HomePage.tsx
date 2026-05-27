@@ -86,7 +86,7 @@ export function HomePage() {
       <ProcessStrip />
 
       {guestRuns.length > 0 && (
-        <section className="max-w-7xl mx-auto px-6 py-10 border-b border-line">
+        <section className="max-w-7xl mx-auto min-w-0 px-4 sm:px-6 py-10 border-b border-line">
           <span className="eyebrow">— recent guest runs</span>
           <p className="mt-2 text-sm text-ink-2 max-w-prose">
             Public gallery entries from guest try sessions (not tied to an account).
@@ -105,8 +105,8 @@ export function HomePage() {
         </section>
       )}
 
-      <section id="gallery" className="max-w-7xl mx-auto px-6 py-20">
-        <header className="mb-10 flex items-end justify-between gap-6 border-b border-line pb-6">
+      <section id="gallery" className="max-w-7xl mx-auto min-w-0 px-4 sm:px-6 py-16 sm:py-20">
+        <header className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 border-b border-line pb-6">
           <div>
             <span className="eyebrow eyebrow-leaf">— the gallery</span>
             <h2

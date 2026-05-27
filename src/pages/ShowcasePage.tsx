@@ -28,7 +28,7 @@ export function ShowcasePage() {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12">
+    <div className="max-w-3xl mx-auto min-w-0 px-4 sm:px-6 py-10 sm:py-12">
       <header className="pb-8 border-b border-line">
         <span className="eyebrow eyebrow-leaf">— how it works</span>
         <h1

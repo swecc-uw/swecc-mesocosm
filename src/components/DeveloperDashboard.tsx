@@ -391,7 +391,7 @@ function EnvironmentCard({
       )}
 
       {/* Usage stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 min-w-0">
         <UsagePill label="runs" value={usage?.total_runs ?? 0} />
         <UsagePill label="episodes" value={usage?.total_episodes ?? 0} />
         <UsagePill label="avg" value={avgScore} />
@@ -518,8 +518,10 @@ function EnvironmentCard({
 
 function SubmitForm({
   onSubmit,
+  onFailure,
 }: {
   onSubmit: (env: DeveloperEnvironment) => void;
+  onFailure?: (message: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -544,7 +546,10 @@ function SubmitForm({
       setOpen(false);
       setForm({ name: "", description: "", github_url: "" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Submission failed");
+      const message = err instanceof Error ? err.message : "Submission failed";
+      setError(message);
+      onFailure?.(message);
+      setOpen(false);
     } finally {
       setLoading(false);
     }
@@ -678,6 +683,7 @@ export default function DeveloperDashboard() {
   const [usageByEnvId, setUsageByEnvId] = useState<Record<string, DomainUsageStats>>({});
   const [scopedRuns, setScopedRuns] = useState<Run[]>([]);
   const [filterName, setFilterName] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [devBenchBusy, setDevBenchBusy] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -847,10 +853,10 @@ export default function DeveloperDashboard() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
+    <div className="max-w-7xl mx-auto min-w-0 px-4 sm:px-6 py-10 sm:py-12">
       <header className="mb-12 max-w-2xl">
         <span className="eyebrow eyebrow-leaf">— developer registry</span>
-        <h1 className="mt-3 text-5xl font-medium text-ink leading-tight [font-family:var(--f-display)]" style={{ letterSpacing: "-0.018em" }}>
+        <h1 className="mt-3 text-4xl sm:text-5xl font-medium text-ink leading-tight [font-family:var(--f-display)]" style={{ letterSpacing: "-0.018em" }}>
           Publish your <em>environment.</em>
         </h1>
         <p className="mt-4 text-lg text-ink-2 leading-relaxed">
@@ -870,13 +876,32 @@ export default function DeveloperDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
         <StatPanel value={total} label={`${scopeLabel} environments`} />
         <StatPanel value={readyCount} label="ready to benchmark" />
         <StatPanel value={pendingCount} label="pending · processing" />
       </div>
 
-      <SubmitForm onSubmit={handleNewEnv} />
+      {submitError && (
+        <div className="mb-6 px-4 py-3 border border-line rounded-[2px] bg-paper-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-sm text-bad font-medium">Submission failed: {submitError}</p>
+          <button
+            type="button"
+            onClick={() => setSubmitError(null)}
+            className="text-[10px] uppercase tracking-[0.14em] text-ink-3 hover:text-ink transition-colors shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      <SubmitForm
+        onSubmit={(env) => {
+          setSubmitError(null);
+          handleNewEnv(env);
+        }}
+        onFailure={setSubmitError}
+      />
 
       {activeTeam && (
         <DeveloperRunsPanel
@@ -902,7 +927,7 @@ export default function DeveloperDashboard() {
         />
       )}
 
-      <div className="mb-10 grid grid-cols-2 gap-6">
+      <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border border-line rounded-[2px] bg-paper-2 p-5">
           <h3 className="text-lg font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
             Via the <em>web form.</em>
@@ -933,7 +958,7 @@ export default function DeveloperDashboard() {
         <SubmitViaApiPanel />
       </section>
 
-      <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
         <div>
           <h2 className="text-2xl font-medium text-ink [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
             {envSectionTitle}
@@ -948,7 +973,7 @@ export default function DeveloperDashboard() {
           value={filterName}
           onChange={(e) => setFilterName(e.target.value)}
           placeholder="filter by name…"
-          className="px-3 h-8 text-sm bg-paper border border-line rounded-full focus:outline-none focus:border-ink transition-colors w-52 placeholder:text-ink-3"
+          className="px-3 h-8 text-sm bg-paper border border-line rounded-full focus:outline-none focus:border-ink transition-colors w-full sm:w-52 max-w-full placeholder:text-ink-3"
         />
       </div>
 
