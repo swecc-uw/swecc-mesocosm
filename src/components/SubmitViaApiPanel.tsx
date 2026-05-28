@@ -44,32 +44,32 @@ function cliSnippet(): string {
   return `# One-time install (PyPI)
 ${CLI_INSTALL}
 
-# Scaffold a new env repo (benchanything.json, adapter.py, env.py, showcase/)
-bench init
+# Scaffold a new env repo (files/benchanything.json, adapter.py, env.py, showcase/)
+mesocosm init
 
 # Defaults: api.swecc.org + /bench (override with SWECC_SERVER_URL / SWECC_BENCH_URL)
-bench auth login --username YOUR_USER --password YOUR_PASSWORD
+mesocosm auth login   # prompts for username and password
 
-bench env submit \\
+mesocosm env submit \\
   --name "My coding bench" \\
   --github-url "https://github.com/your-org/your-env" \\
-  --description "Env with benchanything.json at repo root"
+  --description "Env with files/benchanything.json"
 
 # Optional: attribute env to your active team
-# bench team use TEAM_UUID
-# bench env submit ...`;
+# mesocosm team use TEAM_UUID
+# mesocosm env submit ...`;
 }
 
 function curlSnippet(): string {
-  return `# curl needs a Bearer token — get it from the bench CLI (no manual CSRF/JWT dance)
+  return `# curl needs a Bearer token — get it from the mesocosm CLI (no manual CSRF/JWT dance)
 
 # 1) Install + log in (saves session to ~/.config/swecc/bench_credentials.json)
 ${CLI_INSTALL}
-bench auth login --username YOUR_USER --password YOUR_PASSWORD
+mesocosm auth login   # prompts for username and password
 
 # 2) Export JWT for this shell (run again after logout or if you get 401)
-export TOKEN=$(bench auth token)
-# optional: bench auth token          # print token to stdout
+export TOKEN=$(mesocosm auth token)
+# optional: mesocosm auth token       # print token to stdout
 # optional: echo "$TOKEN" | head -c 24 && echo "..."
 
 # 3) Point curl at production bench-api
@@ -89,7 +89,7 @@ curl -X POST "$BENCH/v1/developer/environments" \\
 export function SubmitViaApiPanel() {
   const [tab, setTab] = useState<TabId>("cli");
   const tabs: { id: TabId; label: string }[] = [
-    { id: "cli", label: "bench CLI" },
+    { id: "cli", label: "mesocosm CLI" },
     { id: "curl", label: "curl · advanced" },
   ];
 
@@ -120,7 +120,7 @@ export function SubmitViaApiPanel() {
         </a>
       </div>
 
-      {tab === "cli" && <SnippetBlock label="production · bench CLI" snippet={cliSnippet()} />}
+      {tab === "cli" && <SnippetBlock label="production · mesocosm CLI" snippet={cliSnippet()} />}
       {tab === "curl" && (
         <SnippetBlock label="production · curl + CLI token" snippet={curlSnippet()} />
       )}
@@ -129,18 +129,18 @@ export function SubmitViaApiPanel() {
         {tab === "curl" ? (
           <>
             Curl cannot read the CLI credential file — you must{" "}
-            <code className="font-mono bg-paper-2 px-1 rounded">bench auth login</code> first, then{" "}
-            <code className="font-mono bg-paper-2 px-1 rounded">export TOKEN=$(bench auth token)</code>{" "}
+            <code className="font-mono bg-paper-2 px-1 rounded">mesocosm auth login</code> first, then{" "}
+            <code className="font-mono bg-paper-2 px-1 rounded">export TOKEN=$(mesocosm auth token)</code>{" "}
             in every new terminal. Re-run login + export if you get{" "}
             <code className="font-mono bg-paper-2 px-1 rounded">401</code>.
           </>
         ) : (
           <>
-            The <code className="font-mono bg-paper-2 px-1 rounded">bench</code> CLI is the
+            The <code className="font-mono bg-paper-2 px-1 rounded">mesocosm</code> CLI is the
             supported path for submit, teams, and runs. It stores your session locally (
             <code className="font-mono bg-paper-2 px-1 rounded">~/.config/swecc/bench_credentials.json</code>
             ) and defaults to production URLs — no{" "}
-            <code className="font-mono bg-paper-2 px-1 rounded">--bench-url</code> flags needed.
+            <code className="font-mono bg-paper-2 px-1 rounded">--base-url</code> flags needed for production.
           </>
         )}
       </p>

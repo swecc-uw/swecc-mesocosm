@@ -944,11 +944,11 @@ export default function DeveloperDashboard() {
             Via <em>CLI.</em>
           </h3>
           <p className="text-sm text-ink-2 mt-2 leading-relaxed">
-            Install the <code className="text-xs font-mono bg-paper px-1 rounded">bench</code> CLI
+            Install the <code className="text-xs font-mono bg-paper px-1 rounded">mesocosm</code> CLI
             with <code className="text-xs font-mono bg-paper px-1 rounded">pip install swecc-mesocosm</code>{" "}
             for CI or your terminal — production URLs are built in. Requires{" "}
-            <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at
-            repo root.
+            <code className="text-xs font-mono bg-paper px-1 rounded">files/benchanything.json</code>{" "}
+            (or legacy <code className="text-xs font-mono bg-paper px-1 rounded">benchanything.json</code> at repo root).
           </p>
         </div>
       </div>
@@ -987,7 +987,7 @@ export default function DeveloperDashboard() {
           <p className="mt-2 text-sm text-ink-3 max-w-sm mx-auto">
             {envs.length === 0
               ? activeTeam
-                ? "Submit with this team active (banner above) or use the CLI with bench team use."
+                ? "Submit with this team active (banner above) or use the CLI with mesocosm team use."
                 : "Submit your first solo environment via the button above or the API."
               : "Try a different name filter."}
           </p>

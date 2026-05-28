@@ -5,12 +5,11 @@ description = "SWECC Bench CLI — installable from the mesocosm repo; talks to 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "swecc-jwt @ git+https://github.com/swecc-uw/swecc-core.git@main#subdirectory=packages/swecc-jwt",
-    "bench-common @ git+https://github.com/swecc-uw/swecc-core.git@main#subdirectory=services/bench/common",
+    "swecc-mesocosm @ git+https://github.com/swecc-uw/swecc-core.git@main#subdirectory=packages/swecc-mesocosm",
 ]
 
 [project.scripts]
-bench = "bench_common.cli.main:main"
+mesocosm = "swecc_mesocosm.cli:main"
 
 [build-system]
 requires = ["hatchling"]

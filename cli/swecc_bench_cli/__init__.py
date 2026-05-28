@@ -1,1 +1,1 @@
-"""Mesocosm distribution package for the SWECC bench CLI (entry point: bench_common.cli)."""
+"""Mesocosm distribution package for the SWECC bench CLI (entry point: swecc_mesocosm.cli)."""
