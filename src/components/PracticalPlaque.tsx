@@ -5,6 +5,7 @@ import {
   AnySpace,
   isCompositeSpace,
   SpaceSpec,
+  domainScoring,
 } from "@/lib/api";
 import {
   Plaque,
@@ -144,9 +145,10 @@ export default function PracticalPlaque({
   const isInDev = domain.status === "draft" || domain.status === "testing";
   const hasLeaderboardData = leaderboard.length > 0;
   const showLeaderboardMetrics = isPublished || hasLeaderboardData;
+  const scoring = domainScoring(domain);
   const sortedLeaderboard = sortLeaderboard(
     leaderboard,
-    domain.scoring.higher_is_better,
+    scoring.higher_is_better,
   );
   const top = sortedLeaderboard[0]?.primary_score;
   const modelsTracked = new Set(leaderboard.map((e) => e.model)).size;
@@ -224,7 +226,7 @@ export default function PracticalPlaque({
       {/* 7. Mini-leaderboard */}
       <MiniLeaderboard
         entries={showLeaderboardMetrics ? sortedLeaderboard : []}
-        primaryMetric={domain.scoring.primary_metric}
+        primaryMetric={scoring.primary_metric}
       />
 
       {/* 8. Three-figure metric strip */}

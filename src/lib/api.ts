@@ -140,6 +140,29 @@ export interface ScoringConfig {
   higher_is_better: boolean;
 }
 
+export const DEFAULT_SCORING: ScoringConfig = {
+  primary_metric: "score",
+  metrics: [],
+  higher_is_better: true,
+};
+
+/** API payloads occasionally omit scoring; never crash the gallery on it. */
+export function domainScoring(
+  domain: Pick<Domain, "scoring"> | { scoring?: ScoringConfig | null },
+): ScoringConfig {
+  return domain.scoring ?? DEFAULT_SCORING;
+}
+
+function normalizeDomain(raw: Domain): Domain {
+  return {
+    ...raw,
+    tags: raw.tags ?? [],
+    detail: raw.detail ?? "",
+    scoring: domainScoring(raw),
+    version_history: raw.version_history ?? [],
+  };
+}
+
 export interface VersionEntry {
   version: string;
   date: string;
@@ -153,7 +176,8 @@ export interface Domain {
   owner_id: string;
   binding_vow: BindingVow;
   endpoint: EnvironmentEndpoint;
-  scoring: ScoringConfig;
+  /** Present on canonical domains; may be omitted in some API list payloads. */
+  scoring?: ScoringConfig;
   status: DomainStatus;
   tags: string[];
   detail: string;
@@ -335,11 +359,13 @@ export async function listDomains(
   opts: { publishedOnly?: boolean } = {},
 ): Promise<Domain[]> {
   const q = opts.publishedOnly ? "?published=true" : "";
-  return getJson<Domain[]>(`/v1/domains${q}`);
+  const rows = await getJson<Domain[]>(`/v1/domains${q}`);
+  return rows.map(normalizeDomain);
 }
 
 export async function getDomain(id: string): Promise<Domain> {
-  return getJson<Domain>(`/v1/domains/${encodeURIComponent(id)}`);
+  const domain = await getJson<Domain>(`/v1/domains/${encodeURIComponent(id)}`);
+  return normalizeDomain(domain);
 }
 
 // ── Leaderboard ────────────────────────────────────────────────────
@@ -510,17 +536,19 @@ export async function deleteTeam(teamId: string): Promise<void> {
 }
 
 export async function publishDomain(domainId: string): Promise<Domain> {
-  return getJson<Domain>(
+  const domain = await getJson<Domain>(
     `/v1/domains/${encodeURIComponent(domainId)}/publish`,
     { method: "POST" },
   );
+  return normalizeDomain(domain);
 }
 
 export async function unpublishDomain(domainId: string): Promise<Domain> {
-  return getJson<Domain>(
+  const domain = await getJson<Domain>(
     `/v1/domains/${encodeURIComponent(domainId)}/unpublish`,
     { method: "POST" },
   );
+  return normalizeDomain(domain);
 }
 
 // ── Bench ──────────────────────────────────────────────────────────

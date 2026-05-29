@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Domain, LeaderboardEntry, publishDomain, unpublishDomain } from "@/lib/api";
+import {
+  Domain,
+  LeaderboardEntry,
+  domainScoring,
+  publishDomain,
+  unpublishDomain,
+} from "@/lib/api";
 import { API_BASE } from "@/lib/env";
 import { Sigil } from "@/components/ds/Sigil";
 import TagBadge from "./TagBadge";
@@ -215,6 +221,7 @@ function BenchPanel({
   leaderboard: LeaderboardEntry[];
   envId?: string;
 }) {
+  const scoring = domainScoring(domain);
   return (
     <div className="space-y-12">
       {envId && (
@@ -250,15 +257,15 @@ function BenchPanel({
           </h2>
           <span className="text-xs text-ink-3">
             primary metric:{" "}
-            <span className="text-ink num-tab">{domain.scoring.primary_metric}</span>
+            <span className="text-ink num-tab">{scoring.primary_metric}</span>
             {" · "}
-            {domain.scoring.higher_is_better ? "↑ higher is better" : "↓ lower is better"}
+            {scoring.higher_is_better ? "↑ higher is better" : "↓ lower is better"}
           </span>
         </div>
         <Leaderboard
           entries={leaderboard}
-          primaryMetric={domain.scoring.primary_metric}
-          higherIsBetter={domain.scoring.higher_is_better}
+          primaryMetric={scoring.primary_metric}
+          higherIsBetter={scoring.higher_is_better}
         />
       </section>
 
