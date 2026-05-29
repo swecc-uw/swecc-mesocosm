@@ -16,6 +16,7 @@ import { useBenchAuth } from "@/hooks/useBenchAuth";
 import { useActiveTeam } from "@/hooks/useActiveTeam";
 import { ScopePill } from "@/components/ScopePill";
 import ExpandableErrorText from "@/components/ExpandableErrorText";
+import { RunVisibilityButton } from "@/components/RunVisibilityButton";
 import { benchAuthDisabled } from "@/lib/env";
 
 interface Props {
@@ -99,6 +100,10 @@ export default function RecentRuns({
 
   const canManageRuns =
     !benchAuthDisabled() && (benchMe.type === "member" || benchMe.type === "guest");
+
+  function handleRunVisibilityUpdated(updated: Run) {
+    setRuns((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+  }
 
   const loadEpisodes = useCallback(async (runId: string) => {
     setLoadingEpisodes((prev) => new Set(prev).add(runId));
@@ -323,6 +328,11 @@ export default function RecentRuns({
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-xs text-ink-2 num-tab">{epSummary}</span>
+                      <RunVisibilityButton
+                        run={run}
+                        galleryEntry={run.requester_id === "gallery"}
+                        onUpdated={handleRunVisibilityUpdated}
+                      />
                       {canManageRuns &&
                         run.requester_id !== "gallery" &&
                         isActiveRunStatus(run.status) && (

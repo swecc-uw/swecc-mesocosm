@@ -20,6 +20,7 @@ export { benchAuthDisabled };
 export type Tier = "tier1" | "tier2";
 export type DomainStatus = "draft" | "testing" | "published" | "archived";
 export type RunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type RunVisibility = "private" | "gallery_public";
 export type EpStatus =
   | "pending"
   | "running"
@@ -283,6 +284,7 @@ export interface RunConfig {
   max_parallel?: number;
   team_id?: string;
   env_id?: string;
+  visibility?: RunVisibility;
 }
 
 export interface Run {
@@ -295,6 +297,7 @@ export interface Run {
   scores: Record<string, number>;
   team_id?: string | null;
   env_id?: string | null;
+  visibility?: RunVisibility | null;
 }
 
 export interface Episode {
@@ -485,6 +488,16 @@ export async function listRunEpisodes(runId: string): Promise<Episode[]> {
 export async function cancelRun(runId: string): Promise<Run> {
   return getJson<Run>(`/v1/runs/${encodeURIComponent(runId)}/cancel`, {
     method: "POST",
+  });
+}
+
+export async function updateRunVisibility(
+  runId: string,
+  visibility: RunVisibility,
+): Promise<Run> {
+  return getJson<Run>(`/v1/runs/${encodeURIComponent(runId)}/visibility`, {
+    method: "PATCH",
+    body: JSON.stringify({ visibility }),
   });
 }
 

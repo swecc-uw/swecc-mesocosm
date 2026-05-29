@@ -17,6 +17,7 @@ import {
   regenerateTeamCode,
   type Run,
 } from "@/lib/api";
+import { RunVisibilityButton } from "@/components/RunVisibilityButton";
 import type { BenchMeContext, BenchTeam, BenchTeamDetail } from "@/types/bench";
 
 export function AccountPage() {
@@ -124,6 +125,10 @@ export function AccountPage() {
   const runLabel = activeTeam ? `${activeTeam.name} runs` : "Solo runs";
   const envValue = activeTeam ? (teamCtx?.env_count ?? 0) : (ctx?.solo.env_count ?? 0);
   const runValue = activeTeam ? (teamCtx?.run_count ?? 0) : (ctx?.solo.run_count ?? 0);
+
+  function handleRunVisibilityUpdated(updated: Run) {
+    setRuns((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12 space-y-10">
@@ -419,6 +424,7 @@ export function AccountPage() {
                   <span className={r.status === "completed" ? "text-ok" : "text-ink-3"}>
                     {r.status}
                   </span>
+                  <RunVisibilityButton run={r} onUpdated={handleRunVisibilityUpdated} />
                 </li>
               ))}
             </ul>
