@@ -12,6 +12,8 @@ import ModelSelector from "./ModelSelector";
 import RecentRuns from "./RecentRuns";
 import VersionHistory from "./VersionHistory";
 import { BenchAccessGate } from "@/components/BenchAccessGate";
+import { useBenchAuth } from "@/hooks/useBenchAuth";
+import { benchAuthDisabled } from "@/lib/env";
 
 interface Props {
   domain: Domain;
@@ -26,8 +28,14 @@ export default function DomainDetailClient({
   leaderboard,
   envId,
 }: Props) {
+  const { benchMe } = useBenchAuth();
   const [domain, setDomain] = useState<Domain>(initialDomain);
   const [mode, setMode] = useState<Mode>("bench");
+  const isDomainOwner =
+    benchAuthDisabled() ||
+    (benchMe.type === "member" &&
+      benchMe.user_id != null &&
+      String(benchMe.user_id) === domain.owner_id);
   const [publishing, setPublishing] = useState(false);
   const [unpublishing, setUnpublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -126,26 +134,28 @@ export default function DomainDetailClient({
                 {domain.status}
               </span>
             )}
-            <BenchAccessGate membersOnly>
-              {domain.status === "draft" && (
-                <button
-                  onClick={handlePublish}
-                  disabled={publishing || unpublishing}
-                  className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-leaf-deep bg-leaf-tint text-leaf-deep hover:bg-leaf-deep hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {publishing ? "Publishing…" : "Publish →"}
-                </button>
-              )}
-              {domain.status === "published" && (
-                <button
-                  onClick={handleUnpublish}
-                  disabled={publishing || unpublishing}
-                  className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-line text-ink-2 hover:border-bad hover:text-bad transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {unpublishing ? "Unpublishing…" : "Unpublish"}
-                </button>
-              )}
-            </BenchAccessGate>
+            {isDomainOwner && (
+              <BenchAccessGate membersOnly>
+                {domain.status === "draft" && (
+                  <button
+                    onClick={handlePublish}
+                    disabled={publishing || unpublishing}
+                    className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-leaf-deep bg-leaf-tint text-leaf-deep hover:bg-leaf-deep hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {publishing ? "Publishing…" : "Publish →"}
+                  </button>
+                )}
+                {domain.status === "published" && (
+                  <button
+                    onClick={handleUnpublish}
+                    disabled={publishing || unpublishing}
+                    className="inline-flex items-center px-2.5 h-6 rounded-[2px] text-[10px] uppercase tracking-[0.16em] font-medium border border-line text-ink-2 hover:border-bad hover:text-bad transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {unpublishing ? "Unpublishing…" : "Unpublish"}
+                  </button>
+                )}
+              </BenchAccessGate>
+            )}
           </div>
           {publishError && (
             <p className="mt-2 text-xs text-bad">{publishError}</p>
