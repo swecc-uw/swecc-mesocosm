@@ -431,8 +431,8 @@ const END_LEADERBOARD = [
   { rk: "02", model: "gpt-5.1",            score: 0.774, turns: 4.5, mist: 1.1, n: "1,280" },
   { rk: "03", model: "gemini-3.0-pro",     score: 0.698, turns: 4.8, mist: 1.4, n: "1,280" },
   { rk: "04", model: "claude-haiku-4-5",   score: 0.612, turns: 5.3, mist: 1.9, n: "1,280" },
-  { rk: "05", model: "llama-4-405b",       score: 0.541, turns: 5.7, mist: 2.2, n: "960"   },
-  { rk: "06", model: "mistral-large-3",    score: 0.488, turns: 6.1, mist: 2.6, n: "960"   },
+  { rk: "05", model: "gpt-4o",             score: 0.541, turns: 5.7, mist: 2.2, n: "960"   },
+  { rk: "06", model: "gemini-2.0-flash",   score: 0.488, turns: 6.1, mist: 2.6, n: "960"   },
 ];
 
 function EndCard() {

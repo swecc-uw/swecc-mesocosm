@@ -744,8 +744,8 @@ const END_LB = [
   { rk: "02", model: "gpt-5.1",            score: "+1.18%", sharpe: "1.87",  dd: "-4.2%",  n: "480" },
   { rk: "03", model: "gemini-3.0-pro",     score: "+0.93%", sharpe: "1.52",  dd: "-5.1%",  n: "480" },
   { rk: "04", model: "claude-haiku-4-5",   score: "+0.61%", sharpe: "1.08",  dd: "-6.4%",  n: "480" },
-  { rk: "05", model: "llama-4-405b",       score: "+0.22%", sharpe: "0.45",  dd: "-8.7%",  n: "360" },
-  { rk: "06", model: "mistral-large-3",    score: "-0.14%", sharpe: "-0.18", dd: "-11.2%", n: "360" },
+  { rk: "05", model: "gpt-4o",             score: "+0.22%", sharpe: "0.45",  dd: "-8.7%",  n: "360" },
+  { rk: "06", model: "gemini-2.0-flash",   score: "-0.14%", sharpe: "-0.18", dd: "-11.2%", n: "360" },
 ];
 
 function EndCard() {

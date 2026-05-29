@@ -270,8 +270,6 @@ export const SUPPORTED_MODELS: { id: string; label: string }[] = [
   { id: "anthropic/claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
   { id: "openai/gpt-4o", label: "GPT-4o" },
   { id: "gemini/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
-  { id: "deepseek/deepseek-chat", label: "DeepSeek Chat" },
-  { id: "xai/grok-2", label: "Grok 2" },
 ];
 
 export interface DomainUsageStats {
