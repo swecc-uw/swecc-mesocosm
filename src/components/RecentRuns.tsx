@@ -93,7 +93,9 @@ export default function RecentRuns({
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const initialLoad = useRef(true);
   const expandedRef = useRef(expanded);
-  expandedRef.current = expanded;
+  useEffect(() => {
+    expandedRef.current = expanded;
+  }, [expanded]);
 
   const canManageRuns =
     !benchAuthDisabled() && (benchMe.type === "member" || benchMe.type === "guest");
