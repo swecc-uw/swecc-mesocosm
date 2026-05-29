@@ -18,7 +18,7 @@ export function DomainDetailPage() {
         const domain = await getDomain(id);
         let leaderboard: LeaderboardEntry[] = [];
         try {
-          leaderboard = await getLeaderboard(id);
+          leaderboard = await getLeaderboard(id, 10);
         } catch {
           leaderboard = [];
         }

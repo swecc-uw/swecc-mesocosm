@@ -65,16 +65,14 @@ export function BenchAuthProvider({ children }: { children: ReactNode }) {
 
   /* eslint-disable react-hooks/set-state-in-effect -- bench principal sync on auth changes */
   useEffect(() => {
-    void refreshBench();
-  }, [refreshBench, isAuthenticated, isVerified]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  useEffect(() => {
-    if (benchAuthDisabled()) return;
-    if (isAuthenticated && isVerified) {
-      void syncMemberBenchAuth().then(() => refreshBench());
-    }
+    void (async () => {
+      if (!benchAuthDisabled() && isAuthenticated && isVerified) {
+        await syncMemberBenchAuth();
+      }
+      await refreshBench();
+    })();
   }, [isAuthenticated, isVerified, refreshBench]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const continueAsGuest = useCallback(async () => {
     const session = await createGuestSession();

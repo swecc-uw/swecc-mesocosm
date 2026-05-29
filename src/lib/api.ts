@@ -364,10 +364,12 @@ export async function createRun(config: RunConfig): Promise<Run> {
 export async function listRuns(opts?: {
   domainId?: string;
   envId?: string;
+  limit?: number;
 }): Promise<Run[]> {
   const params = new URLSearchParams();
   if (opts?.domainId) params.set("domain_id", opts.domainId);
   if (opts?.envId) params.set("env_id", opts.envId);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
   const q = params.toString() ? `?${params}` : "";
   return getJson<Run[]>(`/v1/runs${q}`);
 }
@@ -452,8 +454,11 @@ export async function fetchBenchMeContext(): Promise<BenchMeContext> {
   return getJson<BenchMeContext>("/v1/me/context");
 }
 
-export async function listMyRuns(teamId?: string): Promise<Run[]> {
-  const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : "";
+export async function listMyRuns(opts?: { teamId?: string; limit?: number }): Promise<Run[]> {
+  const params = new URLSearchParams();
+  if (opts?.teamId) params.set("team_id", opts.teamId);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  const q = params.toString() ? `?${params}` : "";
   return getJson<Run[]>(`/v1/me/runs${q}`);
 }
 

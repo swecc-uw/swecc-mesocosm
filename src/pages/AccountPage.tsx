@@ -42,7 +42,7 @@ export function AccountPage() {
     try {
       const [context, myRuns, teamList] = await Promise.all([
         fetchBenchMeContext(),
-        listMyRuns(activeTeam?.id),
+        listMyRuns({ teamId: activeTeam?.id, limit: 30 }),
         listTeams(),
       ]);
       setCtx(context);

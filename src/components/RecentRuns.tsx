@@ -22,9 +22,9 @@ interface Props {
   domainId: string;
 }
 
-type RunWithEpisodes = { run: Run; episodes: Episode[] };
-
-const POLL_MS = 5000;
+const DISPLAY_LIMIT = 20;
+const POLL_ACTIVE_MS = 5000;
+const POLL_IDLE_MS = 30000;
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -82,7 +82,9 @@ export default function RecentRuns({
 }: Props & { bindingVowVersion?: string; envId?: string }) {
   const { benchMe, refreshBench } = useBenchAuth();
   const { team: activeTeam } = useActiveTeam();
-  const [runs, setRuns] = useState<RunWithEpisodes[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [episodesByRunId, setEpisodesByRunId] = useState<Record<string, Episode[]>>({});
+  const [loadingEpisodes, setLoadingEpisodes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -90,9 +92,27 @@ export default function RecentRuns({
   const [refreshing, setRefreshing] = useState(false);
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const initialLoad = useRef(true);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
 
   const canManageRuns =
     !benchAuthDisabled() && (benchMe.type === "member" || benchMe.type === "guest");
+
+  const loadEpisodes = useCallback(async (runId: string) => {
+    setLoadingEpisodes((prev) => new Set(prev).add(runId));
+    try {
+      const episodes = await listRunEpisodes(runId);
+      setEpisodesByRunId((prev) => ({ ...prev, [runId]: episodes }));
+    } catch {
+      setEpisodesByRunId((prev) => ({ ...prev, [runId]: [] }));
+    } finally {
+      setLoadingEpisodes((prev) => {
+        const next = new Set(prev);
+        next.delete(runId);
+        return next;
+      });
+    }
+  }, []);
 
   async function handleCancelRun(runId: string) {
     setCancellingIds((prev) => new Set(prev).add(runId));
@@ -118,8 +138,8 @@ export default function RecentRuns({
       }
 
       const [apiRuns, gallery] = await Promise.all([
-        listRuns({ domainId, envId }).catch(() => [] as Run[]),
-        listGalleryRuns(domainId, 30).catch(() => [] as GalleryRunEntry[]),
+        listRuns({ domainId, envId, limit: DISPLAY_LIMIT }).catch(() => [] as Run[]),
+        listGalleryRuns(domainId, DISPLAY_LIMIT).catch(() => [] as GalleryRunEntry[]),
       ]);
 
       const byId = new Map<string, Run>();
@@ -132,24 +152,26 @@ export default function RecentRuns({
         }
       }
 
-      const sorted = [...byId.values()].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
+      const sorted = [...byId.values()]
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+        .slice(0, DISPLAY_LIMIT);
 
-      const withEpisodes = await Promise.all(
-        sorted.slice(0, 20).map(async (run) => {
-          try {
-            const episodes = await listRunEpisodes(run.id);
-            return { run, episodes };
-          } catch {
-            return { run, episodes: [] };
-          }
-        }),
-      );
-      setRuns(withEpisodes);
+      setRuns(sorted);
       setError(null);
       setLastRefresh(new Date());
+
+      const refreshEpisodeIds = sorted
+        .filter(
+          (run) =>
+            expandedRef.current.has(run.id) && isActiveRunStatus(run.status),
+        )
+        .map((run) => run.id);
+      if (refreshEpisodeIds.length > 0) {
+        await Promise.all(refreshEpisodeIds.map((id) => loadEpisodes(id)));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load runs");
     } finally {
@@ -157,24 +179,32 @@ export default function RecentRuns({
       setRefreshing(false);
       initialLoad.current = false;
     }
-  }, [domainId, envId, bindingVowVersion, benchMe.type, refreshBench]);
+  }, [domainId, envId, bindingVowVersion, benchMe.type, refreshBench, loadEpisodes]);
+
+  const hasActiveRuns = runs.some((run) => isActiveRunStatus(run.status));
+  const pollMs = hasActiveRuns ? POLL_ACTIVE_MS : POLL_IDLE_MS;
 
   useEffect(() => {
     const boot = window.setTimeout(() => void fetchRuns(), 0);
-    const interval = setInterval(() => void fetchRuns(), POLL_MS);
+    const interval = setInterval(() => void fetchRuns(), pollMs);
     return () => {
       window.clearTimeout(boot);
       clearInterval(interval);
     };
-  }, [fetchRuns]);
+  }, [fetchRuns, pollMs]);
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    const willExpand = !expanded.has(id);
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (willExpand) next.add(id);
+      else next.delete(id);
       return next;
     });
+    if (willExpand && !episodesByRunId[id] && !loadingEpisodes.has(id)) {
+      void loadEpisodes(id);
+    }
+  };
 
   const scopeHint =
     benchMe.type === "member"
@@ -223,7 +253,11 @@ export default function RecentRuns({
         </div>
       </div>
       <p className="px-4 py-2 text-[11px] text-ink-3 border-b border-line bg-paper-2">
-        {scopeHint} Polls every {POLL_MS / 1000}s.
+        {scopeHint}{" "}
+        {hasActiveRuns
+          ? `Polls every ${POLL_ACTIVE_MS / 1000}s while runs are active.`
+          : `Polls every ${POLL_IDLE_MS / 1000}s.`}{" "}
+        Expand a row to load episode details.
       </p>
 
       {runs.length === 0 ? (
@@ -238,14 +272,19 @@ export default function RecentRuns({
               : "divide-y divide-line"
           }
         >
-          {runs.map(({ run, episodes }) => {
+          {runs.map((run) => {
             const model = run.config.agent_config.model ?? "unknown";
             const isExpanded = expanded.has(run.id);
-            const completedEps = episodes.filter((e) => e.status === "completed");
-            const failedEps = episodes.filter((e) => e.status === "failed");
+            const episodes = episodesByRunId[run.id];
+            const episodesLoading = loadingEpisodes.has(run.id);
+            const completedEps = episodes?.filter((e) => e.status === "completed") ?? [];
+            const failedEps = episodes?.filter((e) => e.status === "failed") ?? [];
             const totalReward = completedEps.reduce((s, e) => s + e.total_reward, 0);
             const avgReward =
               completedEps.length > 0 ? totalReward / completedEps.length : 0;
+            const epSummary = episodes
+              ? `${completedEps.length}/${episodes.length} ep`
+              : `${run.config.num_episodes} ep`;
 
             return (
               <div key={run.id}>
@@ -281,9 +320,7 @@ export default function RecentRuns({
                       </span>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs text-ink-2 num-tab">
-                        {completedEps.length}/{episodes.length} ep
-                      </span>
+                      <span className="text-xs text-ink-2 num-tab">{epSummary}</span>
                       {canManageRuns &&
                         run.requester_id !== "gallery" &&
                         isActiveRunStatus(run.status) && (
@@ -331,7 +368,11 @@ export default function RecentRuns({
                       run · {run.id}
                     </div>
 
-                    {completedEps.length > 0 && (
+                    {episodesLoading && (
+                      <p className="pl-5 text-xs text-ink-3">loading episodes…</p>
+                    )}
+
+                    {!episodesLoading && episodes && completedEps.length > 0 && (
                       <div className="pl-5 text-xs text-ink-2 flex gap-4">
                         <span>
                           <span className="text-ink-3 uppercase tracking-[0.12em] text-[10px] mr-1">
@@ -355,66 +396,71 @@ export default function RecentRuns({
                       </div>
                     )}
 
-                    <div className="pl-5 space-y-1">
-                      {episodes.map((ep) => (
-                        <div
-                          key={ep.id}
-                          className="flex items-center justify-between text-xs bg-paper-2 border border-line rounded-[2px] px-3 py-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${EP_DOT[ep.status] ?? "bg-ink-3"}`}
-                            />
-                            <span className="text-ink-2 num-tab">
-                              {ep.id.slice(0, 8)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 text-ink-2 num-tab">
-                            <span>
-                              <span className="text-ink-3 uppercase tracking-[0.12em] text-[10px] mr-1">
-                                steps
+                    {!episodesLoading && episodes && episodes.length > 0 && (
+                      <div className="pl-5 space-y-1">
+                        {episodes.map((ep) => (
+                          <div
+                            key={ep.id}
+                            className="flex items-center justify-between text-xs bg-paper-2 border border-line rounded-[2px] px-3 py-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${EP_DOT[ep.status] ?? "bg-ink-3"}`}
+                              />
+                              <span className="text-ink-2 num-tab">
+                                {ep.id.slice(0, 8)}
                               </span>
-                              {ep.steps}
-                            </span>
-                            <span>
-                              <span className="text-ink-3 uppercase tracking-[0.12em] text-[10px] mr-1">
-                                reward
-                              </span>
-                              <span className="num-old text-base text-ink">
-                                {ep.total_reward.toFixed(2)}
-                              </span>
-                            </span>
-                            {ep.terminal_info?.max_tile != null && (
+                            </div>
+                            <div className="flex items-center gap-3 text-ink-2 num-tab">
                               <span>
                                 <span className="text-ink-3 uppercase tracking-[0.12em] text-[10px] mr-1">
-                                  max tile
+                                  steps
                                 </span>
-                                <span>{String(ep.terminal_info.max_tile)}</span>
+                                {ep.steps}
                               </span>
-                            )}
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] font-medium ${RUN_TONE[ep.status] ?? "text-ink-3"}`}
-                            >
-                              {ep.status}
-                            </span>
+                              <span>
+                                <span className="text-ink-3 uppercase tracking-[0.12em] text-[10px] mr-1">
+                                  reward
+                                </span>
+                                <span className="num-old text-base text-ink">
+                                  {ep.total_reward.toFixed(2)}
+                                </span>
+                              </span>
+                              {ep.terminal_info?.max_tile != null && (
+                                <span>
+                                  <span className="text-ink-3 uppercase tracking-[0.12em] text-[10px] mr-1">
+                                    max tile
+                                  </span>
+                                  <span>{String(ep.terminal_info.max_tile)}</span>
+                                </span>
+                              )}
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] font-medium ${RUN_TONE[ep.status] ?? "text-ink-3"}`}
+                              >
+                                {ep.status}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {failedEps.length > 0 && Boolean(failedEps[0].terminal_info?.error) && (
-                      <div className="pl-5 mt-1">
-                        <details className="text-xs">
-                          <summary className="text-bad cursor-pointer uppercase tracking-[0.16em] text-[10px] font-medium">
-                            error details
-                          </summary>
-                          <ExpandableErrorText
-                            className="mt-2"
-                            text={String(failedEps[0].terminal_info.error)}
-                          />
-                        </details>
+                        ))}
                       </div>
                     )}
+
+                    {!episodesLoading &&
+                      episodes &&
+                      failedEps.length > 0 &&
+                      Boolean(failedEps[0].terminal_info?.error) && (
+                        <div className="pl-5 mt-1">
+                          <details className="text-xs">
+                            <summary className="text-bad cursor-pointer uppercase tracking-[0.16em] text-[10px] font-medium">
+                              error details
+                            </summary>
+                            <ExpandableErrorText
+                              className="mt-2"
+                              text={String(failedEps[0].terminal_info.error)}
+                            />
+                          </details>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
