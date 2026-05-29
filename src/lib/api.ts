@@ -345,6 +345,7 @@ export async function getDomain(id: string): Promise<Domain> {
 }
 
 // ── Leaderboard ────────────────────────────────────────────────────
+/** Home gallery cards request a small limit (top 3 shown); domain detail uses default 50. */
 export async function getLeaderboard(
   domainId: string,
   limit = 50,

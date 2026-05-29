@@ -298,7 +298,7 @@ function EnvironmentCard({
         return;
       }
       try {
-        const runs = await listEnvironmentRuns(env.id, 8);
+        const runs = await listEnvironmentRuns(env.id);
         if (!cancelled) setEnvRuns(runs);
       } catch {
         if (!cancelled) setEnvRuns([]);
@@ -491,7 +491,7 @@ function EnvironmentCard({
       {envRuns.length > 0 && (
         <div className="mt-4 border border-line rounded-[2px] divide-y divide-line overflow-hidden">
           <p className="px-3 py-2 eyebrow bg-paper-2">recent runs · this env</p>
-          <ul>
+          <ul className={RUN_LIST_SCROLL}>
             {envRuns.map((run) => (
               <li
                 key={run.id}
@@ -624,6 +624,10 @@ function FormInput({ label, required, type = "text", value, onChange, placeholde
   );
 }
 
+/** Scrollable run lists on developer surfaces (matches domain field table). */
+const RUN_LIST_SCROLL =
+  "max-h-[17.5rem] overflow-y-auto overscroll-y-contain divide-y divide-line";
+
 // ── Team / API runs (not tied to a team dev env row) ───────────────────────────
 
 function DeveloperRunsPanel({
@@ -645,8 +649,8 @@ function DeveloperRunsPanel({
         </h2>
         <p className="text-sm text-ink-2 mt-1 max-w-prose leading-relaxed">{hint}</p>
       </div>
-      <ul className="divide-y divide-line">
-        {runs.slice(0, 12).map((run) => (
+      <ul className={RUN_LIST_SCROLL}>
+        {runs.map((run) => (
           <li key={run.id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm text-ink num-tab truncate">

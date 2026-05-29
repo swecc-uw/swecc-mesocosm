@@ -1,6 +1,7 @@
 "use client";
 
 import { BenchJob, Episode, SUPPORTED_MODELS } from "@/lib/api";
+import ExpandableErrorText from "@/components/ExpandableErrorText";
 
 const MODEL_LABELS: Record<string, string> = Object.fromEntries(
   SUPPORTED_MODELS.map(({ id, label }) => [id, label])
@@ -44,14 +45,12 @@ export function TestBenchResult({ episode }: TestBenchResultProps) {
         <Metric label="status" value={episode.status} />
       </div>
       {episode.status === "failed" && episode.terminal_info?.error != null && (
-        <div className="mt-3 border border-line rounded-[2px] bg-paper-2 px-3 py-2">
+        <div className="mt-3">
           <p className="eyebrow text-bad mb-1">error</p>
-          <pre
-            className="text-xs text-bad whitespace-pre-wrap break-words num-tab leading-relaxed max-h-32 overflow-y-auto"
-            style={{ fontFamily: "var(--f-mono)" }}
-          >
-            {String(episode.terminal_info.error)}
-          </pre>
+          <ExpandableErrorText
+            className="text-xs"
+            text={String(episode.terminal_info.error)}
+          />
         </div>
       )}
     </div>

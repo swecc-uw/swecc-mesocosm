@@ -15,6 +15,7 @@ import type { GalleryRunEntry } from "@/types/bench";
 import { useBenchAuth } from "@/hooks/useBenchAuth";
 import { useActiveTeam } from "@/hooks/useActiveTeam";
 import { ScopePill } from "@/components/ScopePill";
+import ExpandableErrorText from "@/components/ExpandableErrorText";
 import { benchAuthDisabled } from "@/lib/env";
 
 interface Props {
@@ -407,12 +408,10 @@ export default function RecentRuns({
                           <summary className="text-bad cursor-pointer uppercase tracking-[0.16em] text-[10px] font-medium">
                             error details
                           </summary>
-                          <pre
-                            className="mt-2 p-2 border border-line rounded-[2px] bg-paper-2 text-bad overflow-x-auto whitespace-pre-wrap text-[10px] leading-relaxed max-h-32 overflow-y-auto num-tab"
-                            style={{ fontFamily: "var(--f-mono)" }}
-                          >
-                            {String(failedEps[0].terminal_info.error)}
-                          </pre>
+                          <ExpandableErrorText
+                            className="mt-2"
+                            text={String(failedEps[0].terminal_info.error)}
+                          />
                         </details>
                       </div>
                     )}

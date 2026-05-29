@@ -1,26 +1,49 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Domain, LeaderboardEntry } from "@/lib/api";
 import PracticalPlaque from "@/components/PracticalPlaque";
+import { Btn } from "@/components/ds/Btn";
 
 interface Props {
   domains: Domain[];
   leaderboards: Record<string, LeaderboardEntry[]>;
+  allTags: string[];
+  activeTag: string | null;
+  onTagChange: (tag: string | null) => void;
+  totalFilteredCount: number;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  loadingMore?: boolean;
 }
 
-export default function PracticalGallery({ domains, leaderboards }: Props) {
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+export default function PracticalGallery({
+  domains,
+  leaderboards,
+  allTags,
+  activeTag,
+  onTagChange,
+  totalFilteredCount,
+  hasMore,
+  onLoadMore,
+  loadingMore = false,
+}: Props) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const allTags = useMemo(() => {
-    const set = new Set<string>();
-    for (const d of domains) d.tags.forEach((t) => set.add(t));
-    return Array.from(set).sort();
-  }, [domains]);
+  useEffect(() => {
+    if (!hasMore || loadingMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
 
-  const filtered = activeTag
-    ? domains.filter((d) => d.tags.includes(activeTag))
-    : domains;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) onLoadMore();
+      },
+      { rootMargin: "120px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore]);
 
   return (
     <>
@@ -29,21 +52,21 @@ export default function PracticalGallery({ domains, leaderboards }: Props) {
           <TagButton
             label="all"
             active={activeTag === null}
-            onClick={() => setActiveTag(null)}
+            onClick={() => onTagChange(null)}
           />
           {allTags.map((t) => (
             <TagButton
               key={t}
               label={t}
               active={activeTag === t}
-              onClick={() => setActiveTag(activeTag === t ? null : t)}
+              onClick={() => onTagChange(activeTag === t ? null : t)}
             />
           ))}
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((d) => (
+        {domains.map((d) => (
           <PracticalPlaque
             key={d.id}
             domain={d}
@@ -52,7 +75,7 @@ export default function PracticalGallery({ domains, leaderboards }: Props) {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {domains.length === 0 && totalFilteredCount === 0 && activeTag && (
         <div className="py-32 text-center">
           <p className="[font-family:var(--f-display)] italic text-ink-2 text-2xl">
             no exhibits match that tag
@@ -60,8 +83,24 @@ export default function PracticalGallery({ domains, leaderboards }: Props) {
         </div>
       )}
 
+      {hasMore && (
+        <div className="mt-10 flex flex-col items-center gap-4">
+          <Btn
+            variant="ghost"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className={loadingMore ? "opacity-50 cursor-not-allowed" : ""}
+          >
+            {loadingMore ? "Loading exhibits…" : "Load more exhibits"}
+            <span aria-hidden>→</span>
+          </Btn>
+          <div ref={sentinelRef} className="h-1 w-full" aria-hidden />
+        </div>
+      )}
+
       <p className="mt-10 eyebrow text-center">
-        {filtered.length} {filtered.length === 1 ? "exhibit" : "exhibits"}
+        Showing {domains.length} of {totalFilteredCount}{" "}
+        {totalFilteredCount === 1 ? "exhibit" : "exhibits"}
         {activeTag ? ` · filter: ${activeTag}` : ""}
       </p>
     </>

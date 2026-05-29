@@ -1,20 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  Domain,
-  LeaderboardEntry,
-  getLeaderboard,
-  listDomains,
-} from "@/lib/api";
 import PracticalGallery from "@/components/PracticalGallery";
 import { listGalleryRuns } from "@/lib/api";
 import type { GalleryRunEntry } from "@/types/bench";
 import { benchAuthDisabled } from "@/lib/env";
+import { useHomeGallery } from "@/hooks/useHomeGallery";
 
 export function HomePage() {
-  const [domains, setDomains] = useState<Domain[]>([]);
-  const [leaderboards, setLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
-  const [loading, setLoading] = useState(true);
+  const gallery = useHomeGallery();
   const [guestRuns, setGuestRuns] = useState<GalleryRunEntry[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,36 +22,13 @@ export function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
+    if (benchAuthDisabled()) return;
     (async () => {
-      let nextDomains: Domain[] = [];
       try {
-        nextDomains = await listDomains({ publishedOnly: true });
+        const galleryGuest = await listGalleryRuns(undefined, 8);
+        if (!cancelled) setGuestRuns(galleryGuest);
       } catch {
-        nextDomains = [];
-      }
-      const lb: Record<string, LeaderboardEntry[]> = {};
-      await Promise.all(
-        nextDomains.map(async (d) => {
-          try {
-            lb[d.id] = await getLeaderboard(d.id);
-          } catch {
-            lb[d.id] = [];
-          }
-        }),
-      );
-      let galleryGuest: GalleryRunEntry[] = [];
-      if (!benchAuthDisabled()) {
-        try {
-          galleryGuest = await listGalleryRuns(undefined, 8);
-        } catch {
-          galleryGuest = [];
-        }
-      }
-      if (!cancelled) {
-        setDomains(nextDomains);
-        setLeaderboards(lb);
-        setGuestRuns(galleryGuest);
-        setLoading(false);
+        if (!cancelled) setGuestRuns([]);
       }
     })();
     return () => {
@@ -70,9 +40,9 @@ export function HomePage() {
     document.title = "Mesocosm — a field guide to AI environments";
   }, []);
 
-  const exhibitsLive = domains.length;
+  const exhibitsLive = gallery.domains.length;
 
-  if (loading) {
+  if (gallery.loading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-24 text-center text-ink-2 text-sm">
         Loading gallery…
@@ -120,15 +90,20 @@ export function HomePage() {
               the field, or publish your own.
             </p>
           </div>
-          {domains.length > 0 && (
+          {gallery.totalCount > 0 && (
             <span className="hidden md:inline eyebrow">
-              {domains.length} {domains.length === 1 ? "exhibit" : "exhibits"} ·{" "}
-              {Object.values(leaderboards).reduce((n, l) => n + l.length, 0)} runs
+              {gallery.visibleCount} of {gallery.totalFilteredCount}{" "}
+              {gallery.totalFilteredCount === 1 ? "exhibit" : "exhibits"} shown
+              {gallery.activeTag ? ` · ${gallery.activeTag}` : ""}
             </span>
           )}
         </header>
 
-        {domains.length === 0 ? (
+        {gallery.error && (
+          <p className="mb-6 text-sm text-bad">{gallery.error}</p>
+        )}
+
+        {gallery.totalCount === 0 ? (
           <div className="py-32 text-center">
             <p className="[font-family:var(--f-display)] italic text-2xl text-ink-2">no exhibits yet.</p>
             <p className="mt-3 text-sm text-ink-3 max-w-sm mx-auto">
@@ -143,7 +118,17 @@ export function HomePage() {
             </p>
           </div>
         ) : (
-          <PracticalGallery domains={domains} leaderboards={leaderboards} />
+          <PracticalGallery
+            domains={gallery.visibleDomains}
+            leaderboards={gallery.leaderboards}
+            allTags={gallery.allTags}
+            activeTag={gallery.activeTag}
+            onTagChange={gallery.setActiveTag}
+            totalFilteredCount={gallery.totalFilteredCount}
+            hasMore={gallery.hasMore}
+            onLoadMore={gallery.loadMore}
+            loadingMore={gallery.leaderboardsLoading}
+          />
         )}
       </section>
     </>
