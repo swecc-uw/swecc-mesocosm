@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { Domain, LeaderboardEntry } from "@/lib/api";
 import PracticalPlaque from "@/components/PracticalPlaque";
 import { Btn } from "@/components/ds/Btn";
@@ -28,23 +27,6 @@ export default function PracticalGallery({
   onLoadMore,
   loadingMore = false,
 }: Props) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!hasMore || loadingMore) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) onLoadMore();
-      },
-      { rootMargin: "120px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, onLoadMore]);
-
   return (
     <>
       {allTags.length > 0 && (
@@ -84,17 +66,16 @@ export default function PracticalGallery({
       )}
 
       {hasMore && (
-        <div className="mt-10 flex flex-col items-center gap-4">
+        <div className="mt-10 flex justify-center">
           <Btn
             variant="ghost"
             onClick={onLoadMore}
             disabled={loadingMore}
             className={loadingMore ? "opacity-50 cursor-not-allowed" : ""}
           >
-            {loadingMore ? "Loading exhibits…" : "Load more exhibits"}
+            {loadingMore ? "Loading scores…" : "Load more exhibits"}
             <span aria-hidden>→</span>
           </Btn>
-          <div ref={sentinelRef} className="h-1 w-full" aria-hidden />
         </div>
       )}
 

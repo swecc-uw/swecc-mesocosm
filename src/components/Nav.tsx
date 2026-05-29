@@ -7,7 +7,7 @@ import { API_BASE } from "@/lib/env";
 import { useAuth } from "@/hooks/useAuth";
 
 const NAV_LINKS = [
-  { href: "/", label: "Gallery" },
+  { href: "/", label: "Gallery", hash: "#gallery" as const },
   { href: "/showcase", label: "Showcase" },
   { href: "/developer", label: "Developer" },
 ] as const;
@@ -120,8 +120,12 @@ export default function Nav() {
           className="hidden md:flex items-center gap-6 min-w-0"
           aria-label="Main"
         >
-          {NAV_LINKS.map(({ href, label }) => (
-            <Link key={href} to={href} className={linkClass(href)}>
+          {NAV_LINKS.map(({ href, label, ...rest }) => (
+            <Link
+              key={href}
+              to={"hash" in rest ? { pathname: href, hash: rest.hash } : href}
+              className={linkClass(href)}
+            >
               {label}
             </Link>
           ))}
@@ -193,10 +197,10 @@ export default function Nav() {
             className="fixed left-0 right-0 top-14 z-50 max-h-[calc(100dvh-3.5rem)] overflow-y-auto overflow-x-hidden border-b border-line bg-paper shadow-sm md:hidden"
           >
             <div className="max-w-7xl mx-auto min-w-0 px-4 sm:px-6 py-3 flex flex-col gap-1">
-              {NAV_LINKS.map(({ href, label }) => (
+              {NAV_LINKS.map(({ href, label, ...rest }) => (
                 <Link
                   key={href}
-                  to={href}
+                  to={"hash" in rest ? { pathname: href, hash: rest.hash } : href}
                   className={linkClass(href, true)}
                   onClick={closeMenu}
                 >

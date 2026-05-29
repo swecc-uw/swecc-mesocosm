@@ -5,6 +5,7 @@ import { listGalleryRuns } from "@/lib/api";
 import type { GalleryRunEntry } from "@/types/bench";
 import { benchAuthDisabled } from "@/lib/env";
 import { useHomeGallery } from "@/hooks/useHomeGallery";
+import { scrollToGallery } from "@/lib/scrollToGallery";
 
 export function HomePage() {
   const gallery = useHomeGallery();
@@ -15,10 +16,16 @@ export function HomePage() {
   useEffect(() => {
     const st = location.state as { scrollToGallery?: boolean } | null;
     if (st?.scrollToGallery) {
-      document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
+      scrollToGallery();
       navigate(".", { replace: true, state: {} });
     }
   }, [location.state, location.key, navigate]);
+
+  useEffect(() => {
+    if (location.hash === "#gallery") {
+      requestAnimationFrame(() => scrollToGallery());
+    }
+  }, [location.hash, gallery.loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,9 +176,7 @@ function Hero({ exhibitsLive }: { exhibitsLive: number }) {
         <div className="hero-cta">
           <button
             type="button"
-            onClick={() =>
-              document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" })
-            }
+            onClick={() => scrollToGallery()}
             className="inline-flex items-center gap-2 rounded-full px-5 h-10 text-sm font-medium bg-ink text-paper hover:bg-leaf-deep dark:bg-leaf-deep dark:hover:bg-leaf transition-colors"
           >
             Enter the gallery <span aria-hidden>→</span>
