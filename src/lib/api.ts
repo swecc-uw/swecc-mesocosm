@@ -146,6 +146,66 @@ export const DEFAULT_SCORING: ScoringConfig = {
   higher_is_better: true,
 };
 
+const UNKNOWN_SPACE: SpaceSpec = { type: "text", description: "" };
+
+const DEFAULT_BINDING_VOW_TEMPLATE: Omit<BindingVow, "id" | "domain_id"> = {
+  version: "0.0.0",
+  tier: "tier1",
+  observation_space: UNKNOWN_SPACE,
+  action_space: UNKNOWN_SPACE,
+  reward: { type: "scalar", description: "" },
+  episode: {
+    deterministic_reset: false,
+    supports_seed: false,
+    parallel_episodes: 1,
+    observability: "full",
+  },
+  techniques: [],
+  metadata: {},
+  description: "",
+};
+
+export const DEFAULT_ENDPOINT: EnvironmentEndpoint = { mode: "remote" };
+
+/** API list payloads sometimes omit nested vow/endpoint; gallery must not white-screen. */
+export function domainBindingVow(
+  domain: Pick<Domain, "id" | "binding_vow"> | { id: string; binding_vow?: BindingVow | null },
+): BindingVow {
+  const partial = domain.binding_vow;
+  if (partial?.tier && partial.observation_space && partial.action_space && partial.reward) {
+    return {
+      ...DEFAULT_BINDING_VOW_TEMPLATE,
+      ...partial,
+      id: partial.id ?? domain.id,
+      domain_id: partial.domain_id ?? domain.id,
+      episode: { ...DEFAULT_BINDING_VOW_TEMPLATE.episode, ...partial.episode },
+      techniques: partial.techniques ?? [],
+      metadata: partial.metadata ?? {},
+    };
+  }
+  return {
+    ...DEFAULT_BINDING_VOW_TEMPLATE,
+    ...(partial ?? {}),
+    id: partial?.id ?? domain.id,
+    domain_id: partial?.domain_id ?? domain.id,
+    tier: partial?.tier ?? DEFAULT_BINDING_VOW_TEMPLATE.tier,
+    version: partial?.version ?? DEFAULT_BINDING_VOW_TEMPLATE.version,
+    observation_space: partial?.observation_space ?? UNKNOWN_SPACE,
+    action_space: partial?.action_space ?? UNKNOWN_SPACE,
+    reward: partial?.reward ?? DEFAULT_BINDING_VOW_TEMPLATE.reward,
+    episode: {
+      ...DEFAULT_BINDING_VOW_TEMPLATE.episode,
+      ...(partial?.episode ?? {}),
+    },
+  };
+}
+
+export function domainEndpoint(
+  endpoint: EnvironmentEndpoint | null | undefined,
+): EnvironmentEndpoint {
+  return endpoint?.mode ? endpoint : DEFAULT_ENDPOINT;
+}
+
 /** API payloads occasionally omit scoring; never crash the gallery on it. */
 export function domainScoring(
   domain: Pick<Domain, "scoring"> | { scoring?: ScoringConfig | null },
@@ -154,12 +214,21 @@ export function domainScoring(
 }
 
 function normalizeDomain(raw: Domain): Domain {
+  const id = raw.id?.trim() || "";
   return {
     ...raw,
+    id,
+    name: raw.name?.trim() || id || "Untitled exhibit",
+    owner_id: raw.owner_id ?? "—",
+    binding_vow: domainBindingVow({ id, binding_vow: raw.binding_vow }),
+    endpoint: domainEndpoint(raw.endpoint),
     tags: raw.tags ?? [],
     detail: raw.detail ?? "",
     scoring: domainScoring(raw),
+    pricing: raw.pricing ?? "",
+    status: raw.status ?? "draft",
     version_history: raw.version_history ?? [],
+    has_gold_benchmark: raw.has_gold_benchmark ?? false,
   };
 }
 
@@ -176,8 +245,7 @@ export interface Domain {
   owner_id: string;
   binding_vow: BindingVow;
   endpoint: EnvironmentEndpoint;
-  /** Present on canonical domains; may be omitted in some API list payloads. */
-  scoring?: ScoringConfig;
+  scoring: ScoringConfig;
   status: DomainStatus;
   tags: string[];
   detail: string;
@@ -360,7 +428,7 @@ export async function listDomains(
 ): Promise<Domain[]> {
   const q = opts.publishedOnly ? "?published=true" : "";
   const rows = await getJson<Domain[]>(`/v1/domains${q}`);
-  return rows.map(normalizeDomain);
+  return rows.filter((d) => Boolean(d?.id?.trim())).map(normalizeDomain);
 }
 
 export async function getDomain(id: string): Promise<Domain> {

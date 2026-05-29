@@ -5,6 +5,8 @@ import {
   AnySpace,
   isCompositeSpace,
   SpaceSpec,
+  domainBindingVow,
+  domainEndpoint,
   domainScoring,
 } from "@/lib/api";
 import {
@@ -145,6 +147,8 @@ export default function PracticalPlaque({
   const isInDev = domain.status === "draft" || domain.status === "testing";
   const hasLeaderboardData = leaderboard.length > 0;
   const showLeaderboardMetrics = isPublished || hasLeaderboardData;
+  const vow = domainBindingVow(domain);
+  const endpoint = domainEndpoint(domain.endpoint);
   const scoring = domainScoring(domain);
   const sortedLeaderboard = sortLeaderboard(
     leaderboard,
@@ -158,7 +162,7 @@ export default function PracticalPlaque({
       {/* 1. Eyebrow row */}
       <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-line">
         <span className="[font-family:var(--f-display)] italic text-ink-2 text-sm">
-          {TIER_ROMAN[domain.binding_vow.tier] ?? "i."}{" "}
+          {TIER_ROMAN[vow.tier] ?? "i."}{" "}
           <span className="text-ink">{domain.owner_id}</span>
         </span>
         <span>
@@ -187,7 +191,7 @@ export default function PracticalPlaque({
       <PlaquePlate className="!py-5 flex-col gap-3">
         <Sigil id={domain.id} size={64} />
       </PlaquePlate>
-      <ContractChip vow={domain.binding_vow} />
+      <ContractChip vow={vow} />
 
       <PlaqueBody className="!gap-2">
         {/* 3. Title */}
@@ -200,7 +204,7 @@ export default function PracticalPlaque({
 
         {/* 4. Owner line */}
         <div className="text-[11px] text-muted">
-          {domain.owner_id} · v{domain.binding_vow.version}
+          {domain.owner_id} · v{vow.version}
         </div>
 
         {/* 5. One-liner */}
@@ -215,8 +219,8 @@ export default function PracticalPlaque({
 
         {/* 6. Tag row */}
         <div className="flex flex-wrap gap-1.5 mt-1">
-          <Chip tone="leaf">{domain.binding_vow.tier}</Chip>
-          <Chip>{domain.endpoint.mode}</Chip>
+          <Chip tone="leaf">{vow.tier}</Chip>
+          <Chip>{endpoint.mode}</Chip>
           {domain.tags.slice(0, 3).map((t) => (
             <Chip key={t}>{t}</Chip>
           ))}
