@@ -2,13 +2,11 @@ import { Link } from "react-router-dom";
 import {
   Domain,
   LeaderboardEntry,
-  AnySpace,
-  isCompositeSpace,
-  SpaceSpec,
   domainBindingVow,
   domainEndpoint,
   domainScoring,
 } from "@/lib/api";
+import BindingVowChip from "@/components/BindingVowChip";
 import {
   Plaque,
   PlaquePlate,
@@ -39,38 +37,6 @@ function sortLeaderboard(
     const diff = b.primary_score - a.primary_score;
     return higherIsBetter ? diff : -diff;
   });
-}
-
-// ── Contract chip helpers ──────────────────────────────────────────
-function spaceLabel(s: AnySpace): string {
-  if (isCompositeSpace(s)) return "composite";
-  return (s as SpaceSpec).type;
-}
-
-function actionLabel(s: AnySpace): string {
-  const base = spaceLabel(s);
-  if (!isCompositeSpace(s)) {
-    const sp = s as SpaceSpec;
-    if (sp.enum_values && sp.enum_values.length > 0) {
-      return `${base}[${sp.enum_values.length}]`;
-    }
-  }
-  return base;
-}
-
-function ContractChip({ vow }: { vow: Domain["binding_vow"] }) {
-  const obs = spaceLabel(vow.observation_space);
-  const act = actionLabel(vow.action_space);
-  const rew = vow.reward.type;
-  return (
-    <div className="flex items-center justify-center gap-2 py-2 px-3 border-y border-line text-[11px] uppercase tracking-[0.16em] font-medium text-ink-2 [font-family:var(--f-body)]">
-      <span>{obs}</span>
-      <span className="text-ink-3">→</span>
-      <span>{act}</span>
-      <span className="text-ink-3">→</span>
-      <span>{rew}</span>
-    </div>
-  );
 }
 
 // ── Status / tier / mode chips ─────────────────────────────────────
@@ -191,7 +157,7 @@ export default function PracticalPlaque({
       <PlaquePlate className="!py-5 flex-col gap-3">
         <Sigil id={domain.id} size={64} />
       </PlaquePlate>
-      <ContractChip vow={vow} />
+      <BindingVowChip vow={vow} />
 
       <PlaqueBody className="!gap-2">
         {/* 3. Title */}

@@ -6,7 +6,9 @@ import {
   BenchJob,
   deleteEnvironment,
   DeveloperEnvironment,
+  Domain,
   fetchEnvironmentUsage,
+  getDomain,
   listDeveloperEnvironments,
   listEnvironmentRuns,
   listMyRuns,
@@ -22,6 +24,7 @@ import {
   testBench,
   SUPPORTED_MODELS,
 } from "@/lib/api";
+import BindingVowChip from "@/components/BindingVowChip";
 import { Btn } from "@/components/ds/Btn";
 import { FullBenchResult, TestBenchResult } from "@/components/BenchResultPanel";
 import { getActiveTeamId } from "@/lib/benchAuth";
@@ -221,6 +224,85 @@ function TestBenchModal({
   );
 }
 
+function environmentExhibitHref(env: DeveloperEnvironment): string | null {
+  if (!env.domain_id) return null;
+  return `/domains/${env.domain_id}?env_id=${encodeURIComponent(env.id)}`;
+}
+
+function EnvironmentVowPanel({
+  domainId,
+  exhibitHref,
+}: {
+  domainId: string;
+  exhibitHref: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [domain, setDomain] = useState<Domain | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggleOpen() {
+    const next = !open;
+    setOpen(next);
+    if (!next || domain || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setDomain(await getDomain(domainId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load binding vow");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 border border-line rounded-[2px] bg-paper-2 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => void toggleOpen()}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-paper transition-colors"
+      >
+        <span className="eyebrow text-ink-2">
+          {open ? "▾" : "▸"} binding vow
+          {domain ? (
+            <span className="text-ink num-tab normal-case tracking-normal ml-1">
+              v{domain.binding_vow.version}
+            </span>
+          ) : null}
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.14em] text-ink-3 shrink-0">
+          {open ? "collapse" : "expand"}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-line bg-paper px-3 pb-3">
+          {loading && (
+            <p className="py-3 text-xs text-ink-3">Loading vow…</p>
+          )}
+          {error && <p className="py-3 text-xs text-bad">{error}</p>}
+          {domain && !loading && !error && (
+            <>
+              {domain.detail ? (
+                <p className="pt-3 text-sm text-ink-2 leading-relaxed">{domain.detail}</p>
+              ) : null}
+              <BindingVowChip vow={domain.binding_vow} />
+              <div className="pt-3 flex flex-wrap items-center gap-3">
+                <Btn href={exhibitHref} variant="primary">
+                  Open exhibit <span aria-hidden>→</span>
+                </Btn>
+                <Btn href={`${exhibitHref}#run`} variant="link">
+                  Bench a model <span aria-hidden>→</span>
+                </Btn>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Environment card ───────────────────────────────────────────────────────────
 
 function EnvironmentCard({
@@ -254,6 +336,7 @@ function EnvironmentCard({
   const avgScore = usage?.avg_score != null ? usage.avg_score.toFixed(3) : null;
   const bestScore = usage?.best_score != null ? usage.best_score.toFixed(3) : null;
   const canRetry = env.status === "failed" || env.status === "pending";
+  const exhibitHref = environmentExhibitHref(env);
 
   async function handleRetry() {
     setRetrying(true);
@@ -333,9 +416,27 @@ function EnvironmentCard({
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <ScopePill teamId={env.team_id} teamName={teamName} />
           </div>
-          <h3 className="text-base font-medium text-ink truncate [font-family:var(--f-display)]" style={{ letterSpacing: "-0.012em" }}>
-            {env.name}
-          </h3>
+          {exhibitHref ? (
+            <Link
+              to={exhibitHref}
+              className="text-base font-medium text-ink truncate [font-family:var(--f-display)] hover:text-leaf-deep transition-colors block"
+              style={{ letterSpacing: "-0.012em" }}
+            >
+              {env.name}
+            </Link>
+          ) : (
+            <h3
+              className="text-base font-medium text-ink truncate [font-family:var(--f-display)]"
+              style={{ letterSpacing: "-0.012em" }}
+            >
+              {env.name}
+            </h3>
+          )}
+          {exhibitHref && (
+            <p className="text-[10px] uppercase tracking-[0.14em] text-ink-3 mt-1 num-tab truncate">
+              domain · {env.domain_id}
+            </p>
+          )}
           {env.description && (
             <p className="text-sm text-ink-2 mt-0.5 line-clamp-2 leading-relaxed">
               {env.description}
@@ -390,6 +491,18 @@ function EnvironmentCard({
         </div>
       )}
 
+      {exhibitHref ? (
+        <EnvironmentVowPanel domainId={env.domain_id!} exhibitHref={exhibitHref} />
+      ) : (
+        <p className="mb-4 text-xs text-ink-3 leading-relaxed border border-line rounded-[2px] bg-paper-2 px-3 py-2">
+          {env.status === "pending" || env.status === "cloning"
+            ? "Binding vow appears after clone and validation finish."
+            : env.status === "failed"
+              ? "No domain linked — fix errors above and retry, or resubmit."
+              : "No exhibit domain linked yet."}
+        </p>
+      )}
+
       {/* Usage stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 min-w-0">
         <UsagePill label="runs" value={usage?.total_runs ?? 0} />
@@ -400,13 +513,10 @@ function EnvironmentCard({
 
       {/* Action row */}
       <div className="mt-4 flex items-center gap-3 flex-wrap">
-        {env.status === "ready" && env.domain_id && (
-          <Link
-            to={`/domains/${env.domain_id}?env_id=${encodeURIComponent(env.id)}`}
-            className="text-xs text-ink-2 hover:text-leaf-deep transition-colors uppercase tracking-[0.14em]"
-          >
-            View domain →
-          </Link>
+        {exhibitHref && (
+          <Btn href={exhibitHref} variant="ghost">
+            Open exhibit <span aria-hidden>→</span>
+          </Btn>
         )}
 
         {env.status === "ready" && (
@@ -804,8 +914,16 @@ export default function DeveloperDashboard() {
             if (poll.status !== env.status || poll.domain_id !== env.domain_id) {
               setEnvs((prev) =>
                 prev.map((e) =>
-                  e.id === env.id ? { ...e, ...poll } : e
-                )
+                  e.id === env.id
+                    ? {
+                        ...e,
+                        status: poll.status,
+                        domain_id: poll.domain_id,
+                        env_url: poll.env_url,
+                        error_message: poll.error_message,
+                      }
+                    : e,
+                ),
               );
             }
           } catch {
@@ -970,7 +1088,9 @@ export default function DeveloperDashboard() {
           <p className="text-sm text-ink-2 mt-1 max-w-prose">
             {activeTeam
               ? "Only environments submitted while this team is active. Switch to solo on Account to see personal submissions."
-              : "Only your solo submissions. Switch to a team on Account to submit or view team environments."}
+              : "Only your solo submissions. Switch to a team on Account to submit or view team environments."}{" "}
+            When a row has a linked domain, expand <strong className="font-medium text-ink">binding vow</strong> or
+            use <strong className="font-medium text-ink">Open exhibit</strong> to read the full contract.
           </p>
         </div>
         <input
