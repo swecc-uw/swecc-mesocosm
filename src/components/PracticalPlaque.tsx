@@ -24,6 +24,20 @@ interface Props {
 const TIER_ROMAN: Record<string, string> = { tier1: "i.", tier2: "ii." };
 const RANK_ROMAN = ["i", "ii", "iii"];
 
+function formatPrimaryScore(score: number | null | undefined): string {
+  return score != null ? score.toFixed(3) : "—";
+}
+
+function sortLeaderboard(
+  entries: LeaderboardEntry[],
+  higherIsBetter: boolean,
+): LeaderboardEntry[] {
+  return [...entries].sort((a, b) => {
+    const diff = b.primary_score - a.primary_score;
+    return higherIsBetter ? diff : -diff;
+  });
+}
+
 // ── Contract chip helpers ──────────────────────────────────────────
 function spaceLabel(s: AnySpace): string {
   if (isCompositeSpace(s)) return "composite";
@@ -109,7 +123,7 @@ function MiniLeaderboard({
             {e.model}
           </span>
           <span className="num-old text-base text-ink">
-            {e.primary_score.toFixed(3)}
+            {formatPrimaryScore(e.primary_score)}
           </span>
         </div>
       ))}
@@ -128,7 +142,13 @@ export default function PracticalPlaque({
 }: Props) {
   const isPublished = domain.status === "published";
   const isInDev = domain.status === "draft" || domain.status === "testing";
-  const top = leaderboard[0]?.primary_score;
+  const hasLeaderboardData = leaderboard.length > 0;
+  const showLeaderboardMetrics = isPublished || hasLeaderboardData;
+  const sortedLeaderboard = sortLeaderboard(
+    leaderboard,
+    domain.scoring.higher_is_better,
+  );
+  const top = sortedLeaderboard[0]?.primary_score;
   const modelsTracked = new Set(leaderboard.map((e) => e.model)).size;
 
   return (
@@ -203,15 +223,15 @@ export default function PracticalPlaque({
 
       {/* 7. Mini-leaderboard */}
       <MiniLeaderboard
-        entries={isPublished ? leaderboard : []}
+        entries={showLeaderboardMetrics ? sortedLeaderboard : []}
         primaryMetric={domain.scoring.primary_metric}
       />
 
       {/* 8. Three-figure metric strip */}
-      {isPublished ? (
+      {showLeaderboardMetrics ? (
         <PlaqueMetricStrip
           items={[
-            { label: "top score", value: top != null ? top.toFixed(3) : "—" },
+            { label: "top score", value: formatPrimaryScore(top) },
             {
               label: "runs · 7d",
               value: runs7d != null ? runs7d : leaderboard.length,
