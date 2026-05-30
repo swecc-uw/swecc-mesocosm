@@ -548,7 +548,7 @@ function EnvironmentCard({
               <Btn variant="link" onClick={() => setConfirmFull(true)}>Full bench →</Btn>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-ink-2">Run all 5 models?</span>
+                <span className="text-xs text-ink-2">Run all {SUPPORTED_MODELS.length} models?</span>
                 <Btn variant="primary" onClick={handleFullBench}>Confirm →</Btn>
                 <Btn variant="link" onClick={() => setConfirmFull(false)}>Cancel</Btn>
               </div>
