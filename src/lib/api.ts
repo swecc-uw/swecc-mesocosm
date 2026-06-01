@@ -25,9 +25,38 @@ export type EpStatus =
   | "pending"
   | "running"
   | "completed"
+  | "truncated"
   | "failed"
   | "timeout"
   | "cancelled";
+
+export interface RunStatusDetail {
+  detail?: string;
+  episode_outcomes?: Partial<
+    Record<"completed" | "failed" | "truncated" | "cancelled" | "timeout", number>
+  >;
+  failure_reasons?: string[];
+  truncation_reasons?: string[];
+  cancellation_reasons?: string[];
+  primary_episode_reason?: string;
+  num_episodes?: number;
+  scoreable?: number;
+  required_ratio?: number;
+}
+
+export interface RunStatusBatchItem {
+  id: string;
+  status: RunStatus;
+  scores: Record<string, number>;
+  completed_at?: string | null;
+  status_reason?: string | null;
+  status_detail?: RunStatusDetail;
+  truncated_count?: number;
+  failed_count?: number;
+  cancelled_count?: number;
+  failure_reasons?: string[];
+  truncation_reasons?: string[];
+}
 
 export function isActiveRunStatus(status: RunStatus | string): boolean {
   return status === "pending" || status === "running";
@@ -298,6 +327,16 @@ export interface Run {
   team_id?: string | null;
   env_id?: string | null;
   visibility?: RunVisibility | null;
+  status_reason?: string | null;
+  status_detail?: RunStatusDetail;
+  completed_count?: number;
+  failed_count?: number;
+  truncated_count?: number;
+  cancelled_count?: number;
+  timeout_count?: number;
+  failure_reasons?: string[];
+  truncation_reasons?: string[];
+  cancellation_reasons?: string[];
 }
 
 export interface Episode {
@@ -479,6 +518,15 @@ export async function listEnvironmentRuns(envId: string, limit = 50): Promise<Ru
 
 export async function getRun(runId: string): Promise<Run> {
   return getJson<Run>(`/v1/runs/${encodeURIComponent(runId)}`);
+}
+
+export async function batchRunStatus(runIds: string[]): Promise<Record<string, RunStatusBatchItem>> {
+  if (runIds.length === 0) return {};
+  const ids = runIds.map(encodeURIComponent).join(",");
+  const body = await getJson<{ runs: Record<string, RunStatusBatchItem> }>(
+    `/v1/runs/status?ids=${ids}`,
+  );
+  return body.runs ?? {};
 }
 
 export async function listRunEpisodes(runId: string): Promise<Episode[]> {

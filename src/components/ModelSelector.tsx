@@ -16,6 +16,8 @@ import {
 } from "@/lib/api";
 import { BenchAccessGate } from "@/components/BenchAccessGate";
 import { Btn } from "@/components/ds/Btn";
+import { RunStatusReason } from "@/components/RunStatusReason";
+import { summarizeEpisodes } from "@/lib/runStatus";
 import { useActiveTeam } from "@/hooks/useActiveTeam";
 import { useBenchAuth } from "@/hooks/useBenchAuth";
 import { getActiveTeamId } from "@/lib/benchAuth";
@@ -33,31 +35,12 @@ interface Props {
 
 type RunView = { run: Run; episodes: Episode[] };
 
-interface EpSummary {
-  total: number;
-  completed: number;
-  running: number;
-  pending: number;
-  failed: number;
-  timeout: number;
-}
-
-function summarizeEpisodes(episodes: Episode[]): EpSummary {
-  return {
-    total: episodes.length,
-    completed: episodes.filter((e) => e.status === "completed").length,
-    running: episodes.filter((e) => e.status === "running").length,
-    pending: episodes.filter((e) => e.status === "pending").length,
-    failed: episodes.filter((e) => e.status === "failed").length,
-    timeout: episodes.filter((e) => e.status === "timeout").length,
-  };
-}
-
 const RUN_TONE: Record<string, string> = {
   completed: "text-ok",
   failed: "text-bad",
   timeout: "text-bad",
   cancelled: "text-warn",
+  truncated: "text-warn",
   running: "text-leaf-deep",
   pending: "text-ink-3",
 };
@@ -125,7 +108,7 @@ export default function ModelSelector({ domain, envId }: Props) {
               listRunEpisodes(runId),
             ]);
             return [runId, { run, episodes }] as const;
-          })
+          }),
         );
         if (!alive) return;
         const next: Record<string, RunView> = {};
@@ -379,7 +362,21 @@ export default function ModelSelector({ domain, envId }: Props) {
                         {s.timeout}
                       </span>
                     )}
+                    {s.truncated > 0 && (
+                      <span className="text-warn">
+                        <span className="uppercase tracking-[0.12em] text-[10px] mr-1">truncated</span>
+                        {s.truncated}
+                      </span>
+                    )}
+                    {s.cancelled > 0 && (
+                      <span className="text-warn">
+                        <span className="uppercase tracking-[0.12em] text-[10px] mr-1">cancelled</span>
+                        {s.cancelled}
+                      </span>
+                    )}
                   </div>
+
+                  <RunStatusReason run={run} />
 
                   {run.status === "completed" &&
                     Object.keys(run.scores ?? {}).length > 0 && (

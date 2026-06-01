@@ -29,6 +29,7 @@
     "pydantic",
     "relitigate",
     "sandboxed",
+    "scoreable",
     "sigils",
     "Streamable",
     "Syms",

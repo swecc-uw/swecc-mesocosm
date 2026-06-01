@@ -2,6 +2,7 @@
 
 import { BenchJob, Episode, SUPPORTED_MODELS } from "@/lib/api";
 import ExpandableErrorText from "@/components/ExpandableErrorText";
+import { episodeStatusDetail } from "@/lib/runStatus";
 
 const MODEL_LABELS: Record<string, string> = Object.fromEntries(
   SUPPORTED_MODELS.map(({ id, label }) => [id, label])
@@ -13,6 +14,8 @@ const STATUS_STYLE: Record<string, string> = {
   running:   "text-leaf-deep",
   queued:    "text-ink-3",
   timeout:   "text-bad",
+  truncated: "text-warn",
+  cancelled: "text-warn",
 };
 
 function Metric({ label, value }: { label: string; value: string | number | null }) {
@@ -44,13 +47,23 @@ export function TestBenchResult({ episode }: TestBenchResultProps) {
         <Metric label="steps" value={episode.steps} />
         <Metric label="status" value={episode.status} />
       </div>
-      {episode.status === "failed" && episode.terminal_info?.error != null && (
+      {(episode.status === "failed" ||
+        episode.status === "timeout" ||
+        episode.status === "truncated" ||
+        episode.status === "cancelled") && (
         <div className="mt-3">
-          <p className="eyebrow text-bad mb-1">error</p>
-          <ExpandableErrorText
-            className="text-xs"
-            text={String(episode.terminal_info.error)}
-          />
+          {episodeStatusDetail(episode) && (
+            <p className="text-xs text-ink-2 mb-2">{episodeStatusDetail(episode)}</p>
+          )}
+          {episode.terminal_info?.error != null && (
+            <>
+              <p className="eyebrow text-bad mb-1">error</p>
+              <ExpandableErrorText
+                className="text-xs"
+                text={String(episode.terminal_info.error)}
+              />
+            </>
+          )}
         </div>
       )}
     </div>

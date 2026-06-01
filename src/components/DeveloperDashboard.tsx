@@ -24,6 +24,7 @@ import {
   testBench,
   SUPPORTED_MODELS,
 } from "@/lib/api";
+import { reasonLabel } from "@/lib/runStatus";
 import BindingVowChip from "@/components/BindingVowChip";
 import { Btn } from "@/components/ds/Btn";
 import { FullBenchResult, TestBenchResult } from "@/components/BenchResultPanel";
@@ -610,9 +611,16 @@ function EnvironmentCard({
                 <span className="text-ink num-tab truncate">
                   {run.config.agent_config.model ?? "unknown"}
                 </span>
-                <span className="text-ink-3 uppercase tracking-[0.14em] shrink-0">
-                  {run.status}
-                </span>
+                <div className="text-right shrink-0">
+                  <span className="text-ink-3 uppercase tracking-[0.14em] block">
+                    {run.status}
+                  </span>
+                  {run.status_reason && (
+                    <span className="text-[10px] text-ink-3 normal-case tracking-normal block mt-0.5 max-w-[12rem] truncate">
+                      {reasonLabel(run.status_reason)}
+                    </span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -777,9 +785,14 @@ function DeveloperRunsPanel({
                   Domain →
                 </Link>
               )}
-              <span className="text-[10px] uppercase tracking-[0.16em] text-ink-3">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-ink-3 block">
                 {run.status}
               </span>
+              {run.status_reason && (
+                <span className="text-[10px] text-ink-3 normal-case tracking-normal block mt-0.5 max-w-[14rem] truncate text-right">
+                  {reasonLabel(run.status_reason)}
+                </span>
+              )}
             </div>
           </li>
         ))}

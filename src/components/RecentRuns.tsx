@@ -16,6 +16,7 @@ import { useBenchAuth } from "@/hooks/useBenchAuth";
 import { useActiveTeam } from "@/hooks/useActiveTeam";
 import { ScopePill } from "@/components/ScopePill";
 import ExpandableErrorText from "@/components/ExpandableErrorText";
+import { EpisodeTerminalReason, RunStatusReason } from "@/components/RunStatusReason";
 import { RunVisibilityButton } from "@/components/RunVisibilityButton";
 import { benchAuthDisabled } from "@/lib/env";
 
@@ -42,6 +43,7 @@ const RUN_TONE: Record<string, string> = {
   failed: "text-bad",
   timeout: "text-bad",
   cancelled: "text-warn",
+  truncated: "text-warn",
   running: "text-leaf-deep",
   pending: "text-ink-3",
 };
@@ -51,6 +53,7 @@ const EP_DOT: Record<string, string> = {
   failed: "bg-bad",
   timeout: "bg-bad",
   cancelled: "bg-warn",
+  truncated: "bg-warn",
   running: "bg-leaf-deep animate-pulse",
   pending: "bg-ink-3",
 };
@@ -285,7 +288,10 @@ export default function RecentRuns({
             const episodes = episodesByRunId[run.id];
             const episodesLoading = loadingEpisodes.has(run.id);
             const completedEps = episodes?.filter((e) => e.status === "completed") ?? [];
-            const failedEps = episodes?.filter((e) => e.status === "failed") ?? [];
+            const failedEps =
+              episodes?.filter((e) =>
+                ["failed", "timeout", "cancelled", "truncated"].includes(e.status),
+              ) ?? [];
             const totalReward = completedEps.reduce((s, e) => s + e.total_reward, 0);
             const avgReward =
               completedEps.length > 0 ? totalReward / completedEps.length : 0;
@@ -357,6 +363,10 @@ export default function RecentRuns({
                     </div>
                   </div>
 
+                  {(run.status === "failed" || run.status === "cancelled") && (
+                    <RunStatusReason run={run} className="mt-2 pl-5" />
+                  )}
+
                   {run.status === "completed" &&
                     Object.keys(run.scores ?? {}).length > 0 && (
                       <div className="mt-2 pl-5 flex flex-wrap gap-x-4 gap-y-1">
@@ -415,13 +425,16 @@ export default function RecentRuns({
                             key={ep.id}
                             className="flex items-center justify-between text-xs bg-paper-2 border border-line rounded-[2px] px-3 py-2"
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
                               <span
-                                className={`w-1.5 h-1.5 rounded-full ${EP_DOT[ep.status] ?? "bg-ink-3"}`}
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${EP_DOT[ep.status] ?? "bg-ink-3"}`}
                               />
-                              <span className="text-ink-2 num-tab">
-                                {ep.id.slice(0, 8)}
-                              </span>
+                              <div className="min-w-0">
+                                <span className="text-ink-2 num-tab block">
+                                  {ep.id.slice(0, 8)}
+                                </span>
+                                <EpisodeTerminalReason episode={ep} />
+                              </div>
                             </div>
                             <div className="flex items-center gap-3 text-ink-2 num-tab">
                               <span>
@@ -460,17 +473,22 @@ export default function RecentRuns({
                     {!episodesLoading &&
                       episodes &&
                       failedEps.length > 0 &&
-                      Boolean(failedEps[0].terminal_info?.error) && (
-                        <div className="pl-5 mt-1">
-                          <details className="text-xs">
-                            <summary className="text-bad cursor-pointer uppercase tracking-[0.16em] text-[10px] font-medium">
-                              error details
-                            </summary>
-                            <ExpandableErrorText
-                              className="mt-2"
-                              text={String(failedEps[0].terminal_info.error)}
-                            />
-                          </details>
+                      failedEps.some((ep) => ep.terminal_info?.error) && (
+                        <div className="pl-5 mt-1 space-y-2">
+                          {failedEps
+                            .filter((ep) => ep.terminal_info?.error)
+                            .slice(0, 3)
+                            .map((ep) => (
+                              <details key={ep.id} className="text-xs">
+                                <summary className="text-bad cursor-pointer uppercase tracking-[0.16em] text-[10px] font-medium">
+                                  {ep.status} · {ep.id.slice(0, 8)}
+                                </summary>
+                                <ExpandableErrorText
+                                  className="mt-2"
+                                  text={String(ep.terminal_info.error)}
+                                />
+                              </details>
+                            ))}
                         </div>
                       )}
                   </div>
