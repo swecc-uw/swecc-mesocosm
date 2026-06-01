@@ -144,16 +144,19 @@ export default function RecentRuns({
         await refreshBench();
       }
 
-      const [apiRuns, gallery] = await Promise.all([
+      const [apiRuns, galleryPage] = await Promise.all([
         listRuns({ domainId, envId, limit: DISPLAY_LIMIT }).catch(() => [] as Run[]),
-        listGalleryRuns(domainId, DISPLAY_LIMIT).catch(() => [] as GalleryRunEntry[]),
+        listGalleryRuns(domainId, DISPLAY_LIMIT).catch(() => ({
+          items: [] as GalleryRunEntry[],
+          next_cursor: null,
+        })),
       ]);
 
       const byId = new Map<string, Run>();
       for (const run of apiRuns) {
         byId.set(run.id, run);
       }
-      for (const entry of gallery) {
+      for (const entry of galleryPage.items) {
         if (!byId.has(entry.run_id)) {
           byId.set(entry.run_id, runFromGalleryEntry(entry, bindingVowVersion));
         }

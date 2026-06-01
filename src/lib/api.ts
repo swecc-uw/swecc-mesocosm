@@ -12,7 +12,7 @@ import type {
   BenchMeContext,
   BenchTeam,
   BenchTeamDetail,
-  GalleryRunEntry,
+  GalleryRunsPage,
 } from "@/types/bench";
 export { benchAuthDisabled };
 
@@ -572,10 +572,12 @@ export async function listMyRuns(opts?: { teamId?: string; limit?: number }): Pr
 export async function listGalleryRuns(
   domainId?: string,
   limit = 50,
-): Promise<GalleryRunEntry[]> {
+  cursor?: string,
+): Promise<GalleryRunsPage> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (domainId) params.set("domain_id", domainId);
-  return getJson<GalleryRunEntry[]>(`/v1/gallery/runs?${params}`);
+  if (cursor) params.set("cursor", cursor);
+  return getJson<GalleryRunsPage>(`/v1/gallery/runs?${params}`);
 }
 
 export async function listTeams(): Promise<BenchTeam[]> {

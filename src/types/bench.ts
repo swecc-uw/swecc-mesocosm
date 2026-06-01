@@ -31,6 +31,11 @@ export interface GalleryRunEntry {
   actor_label: string;
 }
 
+export interface GalleryRunsPage {
+  items: GalleryRunEntry[];
+  next_cursor: string | null;
+}
+
 export interface BenchTeam {
   team_id: string;
   name: string;
