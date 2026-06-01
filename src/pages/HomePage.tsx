@@ -10,6 +10,8 @@ import { scrollToGallery } from "@/lib/scrollToGallery";
 export function HomePage() {
   const gallery = useHomeGallery();
   const [guestRuns, setGuestRuns] = useState<GalleryRunEntry[]>([]);
+  const [guestRunsCursor, setGuestRunsCursor] = useState<string | null>(null);
+  const [guestRunsLoading, setGuestRunsLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -32,16 +34,36 @@ export function HomePage() {
     if (benchAuthDisabled()) return;
     (async () => {
       try {
-        const galleryGuest = await listGalleryRuns(undefined, 8);
-        if (!cancelled) setGuestRuns(galleryGuest);
+        const page = await listGalleryRuns(undefined, 8);
+        if (!cancelled) {
+          setGuestRuns(page.items);
+          setGuestRunsCursor(page.next_cursor);
+        }
       } catch {
-        if (!cancelled) setGuestRuns([]);
+        if (!cancelled) {
+          setGuestRuns([]);
+          setGuestRunsCursor(null);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  async function loadMoreGuestRuns() {
+    if (!guestRunsCursor || guestRunsLoading) return;
+    setGuestRunsLoading(true);
+    try {
+      const page = await listGalleryRuns(undefined, 8, guestRunsCursor);
+      setGuestRuns((prev) => [...prev, ...page.items]);
+      setGuestRunsCursor(page.next_cursor);
+    } catch {
+      setGuestRunsCursor(null);
+    } finally {
+      setGuestRunsLoading(false);
+    }
+  }
 
   useEffect(() => {
     document.title = "Mesocosm — a field guide to AI environments";
@@ -79,6 +101,16 @@ export function HomePage() {
               </li>
             ))}
           </ul>
+          {guestRunsCursor && (
+            <button
+              type="button"
+              onClick={() => void loadMoreGuestRuns()}
+              disabled={guestRunsLoading}
+              className="mt-4 text-sm text-ink-2 underline underline-offset-4 disabled:opacity-50"
+            >
+              {guestRunsLoading ? "Loading…" : "Load more guest runs"}
+            </button>
+          )}
         </section>
       )}
 
